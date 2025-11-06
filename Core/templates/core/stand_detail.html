@@ -1,0 +1,215 @@
+{% extends 'core/base.html' %}
+
+{% block page_styles %}
+<style>
+    /* Встановлюємо висоту для редактора CodeMirror */
+    .CodeMirror {
+        height: 400px;
+        border: 1px solid #ddd;
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+    <h1 class="mb-3">{{ stand.name }}</h1>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">Опис стенду</div>
+                <div class="card-body">
+                    <p>{{ stand.description }}</p>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">Редактор коду (Arduino C++)</div>
+                <div class="card-body">
+
+                    <textarea id="code-editor" class="form-control" rows="15"
+                              placeholder="Вставте ваш .ino скетч сюди...">void setup() {
+  // put your setup code here, to run once:
+
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+}</textarea>
+
+                    <div class="mt-3">
+                        <button id="flash-button" class="btn btn-success" data-stand-id="{{ stand.pk }}">
+                            🚀 Прошити стенд
+                        </button>
+                        <form method="post" action="{% url 'stand-release' stand.pk %}" class="d-inline ms-2">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">
+                                🛑 Завершити роботу
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div> <div class="col-md-4">
+
+            {% if stand.video_stream_url %}
+            <div class="card mb-4">
+                <div class="card-header">Відео зі стенду</div>
+                <div class="card-body p-0" style="background: #000;">
+                    <img src="{{ stand.video_stream_url }}" class="img-fluid" alt="Live video feed">
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header">Статус</div>
+                <div class="card-body">
+                    {% if stand.is_busy %}
+                        <h5 class="text-danger">🔴 Зайнятий</h5>
+                        <p>Ким: {{ stand.current_user.username|default:"Невідомо" }}</p>
+                    {% else %}
+                        <h5 class="text-success">🟢 Вільний</h5>
+                    {% endif %}
+                    <p><strong>Порт:</strong> {{ stand.port }}</p>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">Монітор порту</div>
+                <pre class="card-body bg-dark text-light" style="height: 300px; overflow-y: scroll;"><code id="port-monitor">[... очікування даних від Arduino ...]</code></pre>
+            </div>
+        </div> </div> {% endblock %}
+
+
+{% block page_scripts %}
+<script>
+    // ... (Функція getCookie залишається без змін) ...
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+
+    // --- ОНОВЛЕНА ФУНКЦІЯ ОПИТУВАННЯ ---
+    function pollJobStatus(jobId, portMonitor, flashButton, editor) { // Додано 'editor'
+
+        const intervalId = setInterval(() => {
+            fetch(`/api/jobs/${jobId}/`, { ... })
+            .then(response => response.json())
+            .then(data => {
+                const status = data.status;
+                const output = data.output;
+
+                if (status === 'completed' || status === 'failed') {
+                    clearInterval(intervalId);
+                    portMonitor.textContent = `--- ЗАВДАННЯ #${jobId} ЗАВЕРШЕНО (Статус: ${status}) ---\n\n${output}`;
+
+                    // Розблоковуємо кнопку ТА РЕДАКТОР
+                    flashButton.disabled = false;
+                    flashButton.textContent = '🚀 Прошити стенд';
+                    editor.setOption("readOnly", false); // <--- ОНОВЛЕНО
+                } else if (status === 'running') {
+                    portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} виконується...\n\n(Агент повідомляє: ${output || '...'})`;
+                } else {
+                    portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} в черзі, очікує на агента...`;
+                }
+            })
+            .catch(error => {
+                console.error('Помилка при опитуванні:', error);
+                clearInterval(intervalId);
+                // Розблоковуємо кнопку ТА РЕДАКТОР
+                flashButton.disabled = false;
+                flashButton.textContent = '🚀 Прошити стенд';
+                editor.setOption("readOnly", false); // <--- ОНОВЛЕНО
+            });
+        }, 2000);
+    }
+
+
+    // --- ОСНОВНИЙ СКРИПТ СТОРІНКИ ---
+    document.addEventListener('DOMContentLoaded', (event) => {
+
+        // Знаходимо елементи
+        const flashButton = document.getElementById('flash-button');
+        const codeEditorElement = document.getElementById('code-editor'); // Наша <textarea>
+        const portMonitor = document.getElementById('port-monitor');
+
+        // ========== 3. ІНІЦІАЛІЗАЦІЯ CODEMIRROR ==========
+        const editor = CodeMirror.fromTextArea(codeEditorElement, {
+            lineNumbers: true,       // Показувати номери рядків
+            mode: "text/x-c++src",   // Режим C++ (для Arduino)
+            theme: "dracula",        // Тема
+            indentUnit: 2,           // Відступ у 2 пробіли
+            tabSize: 2
+        });
+        // ----------------------------------------------------
+
+        // Додаємо "слухача" на клік по кнопці
+        flashButton.addEventListener('click', () => {
+
+            // --- ОНОВЛЕНО: Отримуємо код з CodeMirror ---
+            const code = editor.getValue();
+            const standId = flashButton.dataset.standId;
+
+            if (!code.trim()) {
+                alert('Поле коду не може бути порожнім!');
+                return;
+            }
+
+            portMonitor.textContent = '[...] Створюємо завдання на прошивку...';
+
+            // Блокуємо кнопку ТА РЕДАКТОР
+            flashButton.disabled = true;
+            flashButton.textContent = 'Завдання відправлено...';
+            editor.setOption("readOnly", true); // <--- ОНОВЛЕНО
+
+            // 1. ВІДПРАВЛЯЄМО ЗАВДАННЯ (POST-запит)
+            fetch('/api/jobs/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({
+                    'stand': standId,
+                    'code_to_flash': code,
+                    'status': 'pending'
+                })
+            })
+            .then(response => {
+                if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+                return response.json();
+            })
+            .then(data => {
+                // 2. УСПІХ! ЗАВДАННЯ СТВОРЕНО
+                portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} успішно створено.\nСтатус: ${data.status}.\nОчікуємо на виконання агентом...`;
+
+                // 3. ЗАПУСКАЄМО ОПИТУВАННЯ СТАТУСУ (передаємо 'editor')
+                pollJobStatus(data.id, portMonitor, flashButton, editor);
+            })
+            .catch(error => {
+                // ПОМИЛКА!
+                console.error('Error:', error);
+                portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! Не вдалося створити завдання.\n${error}`;
+
+                // Розблоковуємо кнопку ТА РЕДАКТОР
+                flashButton.disabled = false;
+                flashButton.textContent = '🚀 Прошити стенд';
+                editor.setOption("readOnly", false); // <--- ОНОВЛЕНО
+            });
+        });
+    });
+</script>
+{% endblock %}
