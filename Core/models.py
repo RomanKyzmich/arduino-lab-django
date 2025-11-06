@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
+from datetime import timedelta
 
 class LabStand(models.Model):
     name = models.CharField(max_length=100)
@@ -10,7 +12,19 @@ class LabStand(models.Model):
     current_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     video_stream_url = models.URLField(max_length=200, blank=True, null=True)
     occupied_since = models.DateTimeField(null=True, blank=True)
+    last_agent_heartbeat = models.DateTimeField(null=True, blank=True)
 
+    @property
+    def is_agent_online(self):
+        """
+        Вважаємо агента "онлайн", якщо останній пульс був протягом останніх 2 хвилин (120 секунд).
+        """
+        if not self.last_agent_heartbeat:
+            return False
+
+        # Поріг неактивності: 2 хвилини
+        threshold = timezone.now() - timedelta(seconds=120)
+        return self.last_agent_heartbeat > threshold
 
     def __str__(self):
         return self.name

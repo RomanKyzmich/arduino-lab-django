@@ -2,10 +2,11 @@
 
 {% block page_styles %}
 <style>
-    /* Встановлюємо висоту для редактора CodeMirror */
+    /* Встановлюємо висоту та стилі для редактора CodeMirror */
     .CodeMirror {
-        height: 400px;
-        border: 1px solid #ddd;
+        height: 450px; 
+        border: 1px solid #444;
+        border-radius: 4px;
     }
 </style>
 {% endblock %}
@@ -17,7 +18,9 @@
     <div class="row">
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header">Опис стенду</div>
+                <div class="card-header">
+                    Опис стенду
+                </div>
                 <div class="card-body">
                     <p>{{ stand.description }}</p>
                 </div>
@@ -26,7 +29,7 @@
             <div class="card mt-4">
                 <div class="card-header">Редактор коду (Arduino C++)</div>
                 <div class="card-body">
-
+                    
                     <textarea id="code-editor" class="form-control" rows="15"
                               placeholder="Вставте ваш .ino скетч сюди...">void setup() {
   // put your setup code here, to run once:
@@ -37,11 +40,12 @@ void loop() {
   // put your main code here, to run repeatedly:
 
 }</textarea>
-
+                    
                     <div class="mt-3">
                         <button id="flash-button" class="btn btn-success" data-stand-id="{{ stand.pk }}">
                             🚀 Прошити стенд
                         </button>
+
                         <form method="post" action="{% url 'stand-release' stand.pk %}" class="d-inline ms-2">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-danger">
@@ -54,12 +58,12 @@ void loop() {
         </div> <div class="col-md-4">
 
             {% if stand.video_stream_url %}
-            <div class="card mb-4">
-                <div class="card-header">Відео зі стенду</div>
-                <div class="card-body p-0" style="background: #000;">
-                    <img src="{{ stand.video_stream_url }}" class="img-fluid" alt="Live video feed">
+                <div class="card mb-4">
+                    <div class="card-header">Відео зі стенду</div>
+                    <div class="card-body p-0" style="background: #000;">
+                        <img src="{{ stand.video_stream_url }}" class="img-fluid" alt="Live video feed">
+                    </div>
                 </div>
-            </div>
             {% endif %}
 
             <div class="card">
@@ -76,15 +80,15 @@ void loop() {
             </div>
 
             <div class="card mt-4">
-                <div class="card-header">Монітор порту</div>
-                <pre class="card-body bg-dark text-light" style="height: 300px; overflow-y: scroll;"><code id="port-monitor">[... очікування даних від Arduino ...]</code></pre>
+                <div class="card-header">Монітор порту / Лог прошивки</div>
+                <pre class="card-body bg-dark text-light" style="height: 300px; overflow-y: scroll;"><code id="port-monitor">[... очікування дій ...]</code></pre>
             </div>
         </div> </div> {% endblock %}
 
 
 {% block page_scripts %}
 <script>
-    // ... (Функція getCookie залишається без змін) ...
+    // Функція для отримання CSRF-токену
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -100,67 +104,91 @@ void loop() {
         return cookieValue;
     }
     const csrftoken = getCookie('csrftoken');
-
-
-    // --- ОНОВЛЕНА ФУНКЦІЯ ОПИТУВАННЯ ---
-    function pollJobStatus(jobId, portMonitor, flashButton, editor) { // Додано 'editor'
-
+    
+    // --- 1. ФУНКЦІЯ ОПИТУВАННЯ СТАТУСУ ЗАВДАННЯ ---
+    function pollJobStatus(jobId, portMonitor, flashButton, editor) {
+        
         const intervalId = setInterval(() => {
-            fetch(`/api/jobs/${jobId}/`, { ... })
+            fetch(`/api/jobs/${jobId}/`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
+            })
             .then(response => response.json())
             .then(data => {
                 const status = data.status;
-                const output = data.output;
-
+                const output = data.output || "";
+                
                 if (status === 'completed' || status === 'failed') {
-                    clearInterval(intervalId);
+                    // ЗАВДАННЯ ЗАВЕРШЕНО
+                    clearInterval(intervalId); 
                     portMonitor.textContent = `--- ЗАВДАННЯ #${jobId} ЗАВЕРШЕНО (Статус: ${status}) ---\n\n${output}`;
-
-                    // Розблоковуємо кнопку ТА РЕДАКТОР
+                    
                     flashButton.disabled = false;
                     flashButton.textContent = '🚀 Прошити стенд';
-                    editor.setOption("readOnly", false); // <--- ОНОВЛЕНО
+                    editor.setOption("readOnly", false); 
+
                 } else if (status === 'running') {
+                    // ЗАВДАННЯ ВИКОНУЄТЬСЯ
                     portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} виконується...\n\n(Агент повідомляє: ${output || '...'})`;
+                
                 } else {
+                    // ЗАВДАННЯ В ЧЕРЗІ
                     portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} в черзі, очікує на агента...`;
                 }
             })
             .catch(error => {
                 console.error('Помилка при опитуванні:', error);
                 clearInterval(intervalId);
-                // Розблоковуємо кнопку ТА РЕДАКТОР
                 flashButton.disabled = false;
                 flashButton.textContent = '🚀 Прошити стенд';
-                editor.setOption("readOnly", false); // <--- ОНОВЛЕНО
+                editor.setOption("readOnly", false);
             });
-        }, 2000);
+            
+        }, 2000); 
     }
 
+    // --- 2. ФУНКЦІЯ "ПУЛЬСУ" (HEARTBEAT) ---
+    function sendHeartbeat() {
+        fetch('/api/heartbeat/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status !== 'heartbeat_received') {
+                console.warn("Heartbeat failed or no active stand:", data);
+            }
+        })
+        .catch(error => {
+            console.error('Error sending heartbeat:', error);
+        });
+    }
 
-    // --- ОСНОВНИЙ СКРИПТ СТОРІНКИ ---
+    // ==========================================================
+    // --- ОСНОВНИЙ СКРИПТ ПІСЛЯ ЗАВАНТАЖЕННЯ СТОРІНКИ (DOMContentLoaded) ---
+    // ==========================================================
     document.addEventListener('DOMContentLoaded', (event) => {
 
-        // Знаходимо елементи
+        // 1. Знаходимо елементи
         const flashButton = document.getElementById('flash-button');
-        const codeEditorElement = document.getElementById('code-editor'); // Наша <textarea>
+        const codeEditorElement = document.getElementById('code-editor');
         const portMonitor = document.getElementById('port-monitor');
 
-        // ========== 3. ІНІЦІАЛІЗАЦІЯ CODEMIRROR ==========
+        // 2. ІНІЦІАЛІЗАЦІЯ CODEMIRROR (Створення змінної 'editor')
         const editor = CodeMirror.fromTextArea(codeEditorElement, {
-            lineNumbers: true,       // Показувати номери рядків
-            mode: "text/x-c++src",   // Режим C++ (для Arduino)
-            theme: "dracula",        // Тема
-            indentUnit: 2,           // Відступ у 2 пробіли
+            lineNumbers: true,
+            mode: "text/x-c++src",
+            theme: "dracula",
+            indentUnit: 2,
             tabSize: 2
         });
-        // ----------------------------------------------------
 
-        // Додаємо "слухача" на клік по кнопці
+        // 3. ПРИВ'ЯЗКА ПОДІЙ
+        
+        // "Слухач" кнопки "Прошити" (FLASH)
         flashButton.addEventListener('click', () => {
 
-            // --- ОНОВЛЕНО: Отримуємо код з CodeMirror ---
-            const code = editor.getValue();
+            const code = editor.getValue(); 
             const standId = flashButton.dataset.standId;
 
             if (!code.trim()) {
@@ -169,13 +197,11 @@ void loop() {
             }
 
             portMonitor.textContent = '[...] Створюємо завдання на прошивку...';
-
-            // Блокуємо кнопку ТА РЕДАКТОР
             flashButton.disabled = true;
             flashButton.textContent = 'Завдання відправлено...';
-            editor.setOption("readOnly", true); // <--- ОНОВЛЕНО
+            editor.setOption("readOnly", true);
 
-            // 1. ВІДПРАВЛЯЄМО ЗАВДАННЯ (POST-запит)
+            // ВІДПРАВЛЯЄМО ЗАВДАННЯ (POST-запит)
             fetch('/api/jobs/', {
                 method: 'POST',
                 headers: {
@@ -193,23 +219,23 @@ void loop() {
                 return response.json();
             })
             .then(data => {
-                // 2. УСПІХ! ЗАВДАННЯ СТВОРЕНО
+                // УСПІХ! ЗАВДАННЯ СТВОРЕНО
                 portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} успішно створено.\nСтатус: ${data.status}.\nОчікуємо на виконання агентом...`;
-
-                // 3. ЗАПУСКАЄМО ОПИТУВАННЯ СТАТУСУ (передаємо 'editor')
-                pollJobStatus(data.id, portMonitor, flashButton, editor);
+                pollJobStatus(data.id, portMonitor, flashButton, editor); 
             })
             .catch(error => {
                 // ПОМИЛКА!
                 console.error('Error:', error);
                 portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! Не вдалося створити завдання.\n${error}`;
-
-                // Розблоковуємо кнопку ТА РЕДАКТОР
                 flashButton.disabled = false;
                 flashButton.textContent = '🚀 Прошити стенд';
-                editor.setOption("readOnly", false); // <--- ОНОВЛЕНО
+                editor.setOption("readOnly", false);
             });
         });
+
+        // Запуск "Пульсу"
+        setInterval(sendHeartbeat, 60000); // 1 хвилина
+        
     });
 </script>
 {% endblock %}

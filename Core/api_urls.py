@@ -6,10 +6,15 @@ from . import api_views
 router = DefaultRouter()
 
 # Реєструємо наш ViewSet.
-# DRF автоматично створить URL-адреси для 'jobs'
 router.register(r'jobs', api_views.FlashJobViewSet, basename='job')
 
 # Наші URL-адреси API
 urlpatterns = [
     path('', include(router.urls)),
+
+    # 1. ПУЛЬС АГЕНТА (використовується скриптом agent.py)
+    path('agent-heartbeat/', api_views.agent_heartbeat_view, name='agent-heartbeat'),
+
+    # 2. ПУЛЬС КОРИСТУВАЧА (використовується JavaScript на сторінці стенду)
+    path('heartbeat/', api_views.stand_heartbeat_view, name='stand-heartbeat'),
 ]

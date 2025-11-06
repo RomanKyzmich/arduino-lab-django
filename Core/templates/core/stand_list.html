@@ -15,36 +15,40 @@
                     <h5 class="card-title">{{ stand.name }}</h5>
                     <p class="card-text">{{ stand.description|truncatewords:15 }}</p>
 
-                    {% if stand.is_busy %}
-                        <span class="badge bg-danger">Зайнятий</span>
-                    {% else %}
-                        <span class="badge bg-success">Вільний</span>
-                    {% endif %}
 
+                    {% if not stand.is_agent_online %}
+                        <span class="badge bg-secondary">Офлайн</span>
+                        <a href="#" class="btn btn-secondary btn-sm float-end disabled">
+                            Офлайн
+                        </a>
 
-                    {% if stand.is_busy and stand.current_user != request.user %}
+                    {% elif stand.is_busy and stand.current_user != request.user %}
                         {% if stand.occupied_since and stand.occupied_since < stale_threshold %}
+                            <span class="badge bg-warning text-dark">Зайнятий (неактивний)</span>
                             <a href="{% url 'stand-detail' stand.pk %}" class="btn btn-info btn-sm float-end">
-                                Зайняти (був неактивний)
+                                Зайняти
                             </a>
                         {% else %}
+                            <span class="badge bg-danger">Зайнятий</span>
                             <a href="#" class="btn btn-secondary btn-sm float-end disabled">
                                 Зайнято ({{ stand.current_user.username }})
                             </a>
                         {% endif %}
 
                     {% elif stand.is_busy and stand.current_user == request.user %}
+                        <span class="badge bg-primary">Використовується вами</span>
                         <a href="{% url 'stand-detail' stand.pk %}" class="btn btn-success btn-sm float-end">
                             Повернутись до стенду
                         </a>
 
                     {% else %}
+                        <span class="badge bg-success">Вільний</span>
                         <a href="{% url 'stand-detail' stand.pk %}" class="btn btn-primary btn-sm float-end">
                             До стенду
                         </a>
                     {% endif %}
-                    </div>
-            </div>
+
+                    </div> </div>
         </div>
     {% empty %}
         <div class="col">
