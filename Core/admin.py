@@ -9,7 +9,7 @@ class LabStandAdmin(admin.ModelAdmin):
 
     # Які поля показувати на сторінці редагування
     # (ми просто перелічуємо їх, щоб контролювати порядок)
-    fields = ('name', 'description', 'port', 'video_stream_url', 'schema_image', 'is_busy', 'current_user')
+    fields = ('name', 'description', 'port', 'video_stream_url', 'schema_image', 'validation_rules', 'is_busy', 'current_user')
 
 # Реєструємо модель, але тепер з нашими налаштуваннями
 admin.site.register(LabStand, LabStandAdmin)
