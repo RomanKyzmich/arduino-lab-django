@@ -1,7 +1,13 @@
+import os
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import timedelta
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
+
+schema_storage = FileSystemStorage(location=os.path.join(settings.BASE_DIR, 'media', 'schemas'))
 
 class LabStand(models.Model):
     name = models.CharField(max_length=100)
@@ -13,6 +19,11 @@ class LabStand(models.Model):
     video_stream_url = models.URLField(max_length=200, blank=True, null=True)
     occupied_since = models.DateTimeField(null=True, blank=True)
     last_agent_heartbeat = models.DateTimeField(null=True, blank=True)
+    installed_libraries = models.JSONField(default=list, blank=True)
+    validation_rules = models.JSONField(default=dict, blank=True)
+    schema_image = models.ImageField(upload_to='schemas/', blank=True, null=True, storage=schema_storage,
+                                     help_text="Зображення електричної схеми стенду")
+
 
     @property
     def is_agent_online(self):
@@ -52,7 +63,8 @@ class FlashJob(models.Model):
 
     # Код, який потрібно прошити
     code_to_flash = models.TextField()
-
+    # Встановлюємо 9600 як стандартне
+    baud_rate = models.IntegerField(default=9600)
     # Поточний статус
     status = models.CharField(
         max_length=20,
@@ -68,3 +80,39 @@ class FlashJob(models.Model):
 
     def __str__(self):
         return f"Job #{self.id} for {self.stand.name} ({self.status})"
+
+
+class LibraryJob(models.Model):
+    """
+    Модель, що представляє одне завдання на встановлення бібліотеки.
+    """
+    STATUS_PENDING = 'pending'
+    STATUS_RUNNING = 'running'
+    STATUS_COMPLETED = 'completed'
+    STATUS_FAILED = 'failed'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Очікування'),
+        (STATUS_RUNNING, 'Виконується'),
+        (STATUS_COMPLETED, 'Завершено'),
+        (STATUS_FAILED, 'Помилка'),
+    ]
+
+    stand = models.ForeignKey(LabStand, on_delete=models.CASCADE, related_name='lib_jobs')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    # Назва бібліотеки для встановлення
+    library_name = models.CharField(max_length=100)
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING
+    )
+
+    output = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"LibJob #{self.id} for {self.stand.name} ({self.library_name})"

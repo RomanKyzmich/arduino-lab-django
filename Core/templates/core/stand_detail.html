@@ -4,9 +4,24 @@
 <style>
     /* Встановлюємо висоту та стилі для редактора CodeMirror */
     .CodeMirror {
-        height: 450px; 
+        height: 450px;
         border: 1px solid #444;
         border-radius: 4px;
+    }
+    /* Стиль для логів (pre) */
+    .log-monitor {
+        height: 300px;
+        overflow-y: scroll;
+        background: #212529; /* bg-dark */
+        color: #f8f9fa; /* text-light */
+        font-family: monospace;
+        font-size: 0.85em;
+        padding: 0.5rem;
+    }
+
+    /* ✅ НОВИЙ СТИЛЬ: Ховаємо стандартний input[type=file] */
+    #file-input {
+        display: none;
     }
 </style>
 {% endblock %}
@@ -29,7 +44,7 @@
             <div class="card mt-4">
                 <div class="card-header">Редактор коду (Arduino C++)</div>
                 <div class="card-body">
-                    
+
                     <textarea id="code-editor" class="form-control" rows="15"
                               placeholder="Вставте ваш .ino скетч сюди...">void setup() {
   // put your setup code here, to run once:
@@ -40,21 +55,58 @@ void loop() {
   // put your main code here, to run repeatedly:
 
 }</textarea>
-                    
-                    <div class="mt-3">
-                        <button id="flash-button" class="btn btn-success" data-stand-id="{{ stand.pk }}">
+
+                    <div class="mt-3 d-flex align-items-center flex-wrap">
+
+                        <button id="flash-button" class="btn btn-success me-2 mb-2" data-stand-id="{{ stand.pk }}">
                             🚀 Прошити стенд
                         </button>
 
-                        <form method="post" action="{% url 'stand-release' stand.pk %}" class="d-inline ms-2">
+                        <label for="file-input" class="btn btn-info me-2 mb-2">
+                            📂 Завантажити .ino
+                        </label>
+                        <input type="file" id="file-input" accept=".ino">
+
+                        <div class="me-3 mb-2">
+                            <label for="baud-rate-select" class="form-label-sm mb-0">Швидкість (Baud):</label>
+                            <select id="baud-rate-select" class="form-select form-select-sm" style="width: 120px;">
+                                <option value="300">300</option>
+                                <option value="1200">1200</option>
+                                <option value="2400">2400</option>
+                                <option value="4800">4800</option>
+                                <option value="9600" selected>9600</option>
+                                <option value="19200">19200</option>
+                                <option value="38400">38400</option>
+                                <option value="57600">57600</option>
+                                <option value="115200">115200</option>
+                            </select>
+                        </div>
+
+                        <form id="release-form" method="post" action="{% url 'stand-release' stand.pk %}" class="d-inline ms-auto mb-2">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-danger">
                                 🛑 Завершити роботу
                             </button>
                         </form>
                     </div>
+
                 </div>
             </div>
+
+            <div class="card mt-4">
+                <div class="card-header">Встановлення бібліотек</div>
+                <div class="card-body">
+                    <div class="input-group mb-3">
+                        <input type="text" id="lib-install-name" class="form-control" placeholder="Назва бібліотеки (напр. 'Adafruit GFX Library')">
+                        <button class="btn btn-primary" type="button" id="lib-install-button">
+                            📥 Встановити
+                        </button>
+                    </div>
+                    <h6>Лог встановлення:</h6>
+                    <pre class="log-monitor"><code id="lib-install-monitor">[... очікування дій ...]</code></pre>
+                </div>
+            </div>
+
         </div> <div class="col-md-4">
 
             {% if stand.video_stream_url %}
@@ -78,16 +130,58 @@ void loop() {
                     <p><strong>Порт:</strong> {{ stand.port }}</p>
                 </div>
             </div>
+            {% if stand.schema_image %}
+                <div class="card mt-4">
+                    <div class="card-header">Електрична схема</div>
+                    <div class="card-body p-0">
+                        <a href="{{ stand.schema_image.url }}" target="_blank">
+                            <img src="{{ stand.schema_image.url }}" class="img-fluid" alt="Електрична схема стенду">
+                        </a>
+                    </div>
+                    <div class="card-footer text-muted small">
+                        Натисніть на зображення, щоб відкрити у повному розмірі.
+                    </div>
+                </div>
+            {% else %}
+                <div class="card mt-4">
+                    <div class="card-header">Електрична схема</div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-0">Схема не завантажена.</p>
+                    </div>
+                </div>
+            {% endif %}
+            <div class="card mt-4">
+                <div class="card-header">Встановлені бібліотеки</div>
+                <div class="card-body" style="height: 200px; overflow-y: scroll;">
+
+                    {% if stand.is_agent_online %}
+                        <ul class="list-unstyled small">
+                        {% for lib_name in stand.installed_libraries %}
+                            <li>
+                                <strong>{{ lib_name }}</strong>
+                            </li>
+                        {% empty %}
+                             <li>Список порожній.</li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="small text-muted">Агент офлайн. Список буде доступний, коли він підключиться.</p>
+                    {% endif %}
+
+                </div>
+            </div>
 
             <div class="card mt-4">
                 <div class="card-header">Монітор порту / Лог прошивки</div>
-                <pre class="card-body bg-dark text-light" style="height: 300px; overflow-y: scroll;"><code id="port-monitor">[... очікування дій ...]</code></pre>
+                <pre class="log-monitor"><code id="port-monitor">[... очікування дій ...]</code></pre>
             </div>
+
         </div> </div> {% endblock %}
 
 
 {% block page_scripts %}
 <script>
+    // ... (Функції getCookie, pollJobStatus, sendHeartbeat, sendJob - без змін) ...
     // Функція для отримання CSRF-токену
     function getCookie(name) {
         let cookieValue = null;
@@ -104,12 +198,12 @@ void loop() {
         return cookieValue;
     }
     const csrftoken = getCookie('csrftoken');
-    
-    // --- 1. ФУНКЦІЯ ОПИТУВАННЯ СТАТУСУ ЗАВДАННЯ ---
-    function pollJobStatus(jobId, portMonitor, flashButton, editor) {
-        
+
+    // --- 1. ФУНКЦІЯ ОПИТУВАННЯ СТАТУСУ (УНІВЕРСАЛЬНА) ---
+    function pollJobStatus(jobId, monitorElement, endpoint, onDoneCallback = null) {
+
         const intervalId = setInterval(() => {
-            fetch(`/api/jobs/${jobId}/`, {
+            fetch(`${endpoint}${jobId}/`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
             })
@@ -117,34 +211,27 @@ void loop() {
             .then(data => {
                 const status = data.status;
                 const output = data.output || "";
-                
+
                 if (status === 'completed' || status === 'failed') {
-                    // ЗАВДАННЯ ЗАВЕРШЕНО
-                    clearInterval(intervalId); 
-                    portMonitor.textContent = `--- ЗАВДАННЯ #${jobId} ЗАВЕРШЕНО (Статус: ${status}) ---\n\n${output}`;
-                    
-                    flashButton.disabled = false;
-                    flashButton.textContent = '🚀 Прошити стенд';
-                    editor.setOption("readOnly", false); 
+                    clearInterval(intervalId);
+                    monitorElement.textContent = `--- ЗАВДАННЯ #${jobId} ЗАВЕРШЕНО (Статус: ${status}) ---\n\n${output}`;
+                    if (onDoneCallback) onDoneCallback();
 
                 } else if (status === 'running') {
-                    // ЗАВДАННЯ ВИКОНУЄТЬСЯ
-                    portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} виконується...\n\n(Агент повідомляє: ${output || '...'})`;
-                
+                    monitorElement.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} виконується...\n\n(Агент повідомляє: ${output || '...'})`;
+
                 } else {
-                    // ЗАВДАННЯ В ЧЕРЗІ
-                    portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} в черзі, очікує на агента...`;
+                    monitorElement.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} в черзі, очікує на агента...`;
                 }
             })
             .catch(error => {
                 console.error('Помилка при опитуванні:', error);
                 clearInterval(intervalId);
-                flashButton.disabled = false;
-                flashButton.textContent = '🚀 Прошити стенд';
-                editor.setOption("readOnly", false);
+                monitorElement.textContent = `ПОМИЛКА опитування завдання #${jobId}. ${error}`;
+                if (onDoneCallback) onDoneCallback();
             });
-            
-        }, 2000); 
+
+        }, 2000);
     }
 
     // --- 2. ФУНКЦІЯ "ПУЛЬСУ" (HEARTBEAT) ---
@@ -164,17 +251,50 @@ void loop() {
         });
     }
 
+    // --- 3. ФУНКЦІЯ ВІДПРАВКИ ЗАВДАННЯ (УНІВЕРСАЛЬНА) ---
+    function sendJob(endpoint, payload, monitorElement) {
+        monitorElement.textContent = '[...] Створюємо завдання...';
+
+        return fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(JSON.stringify(err));
+                });
+            }
+            return response.json();
+        });
+    }
+
     // ==========================================================
-    // --- ОСНОВНИЙ СКРИПТ ПІСЛЯ ЗАВАНТАЖЕННЯ СТОРІНКИ (DOMContentLoaded) ---
+    // --- ОСНОВНИЙ СКРИПТ (DOMContentLoaded) ---
     // ==========================================================
     document.addEventListener('DOMContentLoaded', (event) => {
 
-        // 1. Знаходимо елементи
+        // --- 1. Знаходимо елементи ---
         const flashButton = document.getElementById('flash-button');
         const codeEditorElement = document.getElementById('code-editor');
         const portMonitor = document.getElementById('port-monitor');
+        const releaseForm = document.getElementById('release-form');
 
-        // 2. ІНІЦІАЛІЗАЦІЯ CODEMIRROR (Створення змінної 'editor')
+        const libInstallButton = document.getElementById('lib-install-button');
+        const libInstallName = document.getElementById('lib-install-name');
+        const libInstallMonitor = document.getElementById('lib-install-monitor');
+
+        // ✅ 1.1 Знаходимо новий елемент для завантаження файлу
+        const fileInput = document.getElementById('file-input');
+
+        const standId = flashButton.dataset.standId;
+        const localStorageKey = `lab-code-stand-${standId}`;
+
+        // --- 2. ІНІЦІАЛІЗАЦІЯ CODEMIRROR ---
         const editor = CodeMirror.fromTextArea(codeEditorElement, {
             lineNumbers: true,
             mode: "text/x-c++src",
@@ -183,59 +303,159 @@ void loop() {
             tabSize: 2
         });
 
-        // 3. ПРИВ'ЯЗКА ПОДІЙ
-        
-        // "Слухач" кнопки "Прошити" (FLASH)
-        flashButton.addEventListener('click', () => {
+        // --- 3. ЗАВАНТАЖЕННЯ ЗБЕРЕЖЕНОГО КОДУ ---
+        const savedCode = localStorage.getItem(localStorageKey);
+        if (savedCode) {
+            editor.setValue(savedCode);
+        }
 
-            const code = editor.getValue(); 
-            const standId = flashButton.dataset.standId;
+        // --- 4. ПРИВ'ЯЗКА ПОДІЙ ---
+
+        // 4.1 ЗБЕРЕЖЕННЯ КОДУ ПРИ ЗМІНАХ
+        let saveTimeout;
+        editor.on('change', () => {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                const currentCode = editor.getValue();
+                localStorage.setItem(localStorageKey, currentCode);
+            }, 500);
+        });
+
+        // 4.2 "Слухач" кнопки "Прошити" (FLASH)
+        flashButton.addEventListener('click', () => {
+            const code = editor.getValue();
+            const baudRate = document.getElementById('baud-rate-select').value;
 
             if (!code.trim()) {
                 alert('Поле коду не може бути порожнім!');
                 return;
             }
 
-            portMonitor.textContent = '[...] Створюємо завдання на прошивку...';
             flashButton.disabled = true;
             flashButton.textContent = 'Завдання відправлено...';
             editor.setOption("readOnly", true);
 
-            // ВІДПРАВЛЯЄМО ЗАВДАННЯ (POST-запит)
-            fetch('/api/jobs/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                },
-                body: JSON.stringify({
-                    'stand': standId,
-                    'code_to_flash': code,
-                    'status': 'pending'
+            const payload = {
+                'stand': standId,
+                'code_to_flash': code,
+                'status': 'pending',
+                'baud_rate': parseInt(baudRate, 10)
+            };
+
+            sendJob('/api/jobs/', payload, portMonitor)
+                .then(data => {
+                    portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Очікуємо...`;
+                    pollJobStatus(data.id, portMonitor, '/api/jobs/', () => {
+                        // onDone
+                        flashButton.disabled = false;
+                        flashButton.textContent = '🚀 Прошити стенд';
+                        editor.setOption("readOnly", false);
+                    });
                 })
-            })
-            .then(response => {
-                if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
-                return response.json();
-            })
-            .then(data => {
-                // УСПІХ! ЗАВДАННЯ СТВОРЕНО
-                portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} успішно створено.\nСтатус: ${data.status}.\nОчікуємо на виконання агентом...`;
-                pollJobStatus(data.id, portMonitor, flashButton, editor); 
-            })
-            .catch(error => {
-                // ПОМИЛКА!
-                console.error('Error:', error);
-                portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! Не вдалося створити завдання.\n${error}`;
-                flashButton.disabled = false;
-                flashButton.textContent = '🚀 Прошити стенд';
-                editor.setOption("readOnly", false);
-            });
+                .catch(error => {
+                    // ✅ ОБРОБКА ПОМИЛОК ВАЛІДАЦІЇ
+                    // error.message містить JSON-рядок, який ми перетворимо назад
+                    try {
+                        const errData = JSON.parse(error.message);
+                        portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${errData.error}`;
+                    } catch(e) {
+                         portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`;
+                    }
+
+                    flashButton.disabled = false;
+                    flashButton.textContent = '🚀 Прошити стенд';
+                    editor.setOption("readOnly", false);
+                });
         });
 
-        // Запуск "Пульсу"
+        // 4.3 "Слухач" кнопки "Встановити бібліотеку"
+        if (libInstallButton) {
+            libInstallButton.addEventListener('click', () => {
+                const libraryName = libInstallName.value.trim();
+
+                if (!libraryName) {
+                    alert('Введіть назву бібліотеки!');
+                    return;
+                }
+
+                libInstallButton.disabled = true;
+                libInstallName.disabled = true;
+
+                const payload = {
+                    'stand': standId,
+                    'library_name': libraryName,
+                    'status': 'pending'
+                };
+
+                sendJob('/api/lib-jobs/', payload, libInstallMonitor)
+                    .then(data => {
+                        libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Встановлюємо '${data.library_name}'...`;
+                        pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
+                            // onDone
+                            libInstallButton.disabled = false;
+                            libInstallName.disabled = false;
+                            libInstallName.value = '';
+
+                            // Автоматично перезавантажуємо сторінку
+                            location.reload();
+                        });
+                    })
+                    .catch(error => {
+                        libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`;
+                        libInstallButton.disabled = false;
+                        libInstallName.disabled = false;
+                    });
+            });
+        }
+
+
+        // 4.4 ОЧИЩЕННЯ СХОВИЩА ПРИ ВИХОДІ
+        if (releaseForm) {
+            releaseForm.addEventListener('submit', () => {
+                localStorage.removeItem(localStorageKey);
+            });
+        }
+
+        // 4.5 Запуск "Пульсу"
         setInterval(sendHeartbeat, 60000); // 1 хвилина
-        
+
+        // ✅ 4.6 НОВИЙ "СЛУХАЧ" ДЛЯ ЗАВАНТАЖЕННЯ ФАЙЛУ
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) {
+                    return;
+                }
+
+                // Перевіряємо, що це .ino (хоча 'accept' вже мав це зробити)
+                if (!file.name.endsWith('.ino')) {
+                    alert('Будь ласка, завантажуйте лише .ino файли');
+                    return;
+                }
+
+                const reader = new FileReader();
+
+                reader.onload = (event) => {
+                    const fileContent = event.target.result;
+                    // Встановлюємо зчитаний текст в редактор
+                    editor.setValue(fileContent);
+                    // Одразу зберігаємо в localStorage
+                    localStorage.setItem(localStorageKey, fileContent);
+                };
+
+                reader.onerror = (event) => {
+                    alert('Не вдалося прочитати файл.');
+                    console.error("Помилка FileReader:", event);
+                };
+
+                // Читаємо файл як текст
+                reader.readAsText(file);
+
+                // Очищуємо input, щоб можна було завантажити той самий файл знову
+                e.target.value = null;
+            });
+        }
+
     });
 </script>
 {% endblock %}

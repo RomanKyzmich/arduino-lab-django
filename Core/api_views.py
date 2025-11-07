@@ -2,10 +2,10 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.utils import timezone
-
+from .linter import validate_code
 # ⚠️ ПЕРЕКОНАЙТЕСЯ, ЩО ЦІ МОДЕЛІ ІМПОРТОВАНІ
-from .models import FlashJob, LabStand
-from .serializers import FlashJobSerializer
+from .models import FlashJob, LabStand, LibraryJob
+from .serializers import FlashJobSerializer, LibraryJobSerializer
 
 
 # =======================================================
@@ -20,11 +20,46 @@ class FlashJobViewSet(viewsets.ModelViewSet):
     serializer_class = FlashJobSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    # 🔽🔽🔽 2. ПЕРЕВИЗНАЧТЕ МЕТОД 'CREATE' 🔽🔽🔽
+    def create(self, request, *args, **kwargs):
+        code = request.data.get('code_to_flash')
+        stand_id = request.data.get('stand')
+
+        if not code or not stand_id:
+            return Response({'error': 'Відсутній код або ID стенду'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Знаходимо стенд і його правила
+            stand = LabStand.objects.get(pk=stand_id)
+            rules = stand.validation_rules
+
+            # Запускаємо валідацію ТІЛЬКИ якщо правила існують
+            if rules:
+                print(f"🔬 Запуск лінтера для стенду '{stand.name}' з правилами: {rules}")
+                is_safe, message = validate_code(code, rules)
+
+                if not is_safe:
+                    # 3. БЛОКУЄМО ЗАПИТ, ЯКЩО НЕБЕЗПЕЧНО
+                    print(f"🛑 НЕБЕЗПЕЧНИЙ КОД ЗАБЛОКОВАНО: {message}")
+                    # Повертаємо помилку 400, яку побачить JavaScript
+                    return Response({'error': f"Помилка валідації: {message}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            print("✅ Код пройшов валідацію.")
+
+        except LabStand.DoesNotExist:
+            return Response({'error': 'Стенд не знайдено'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            # Ловимо будь-які помилки в самому лінтері
+            return Response({'error': f'Внутрішня помилка лінтера: {str(e)}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 4. Якщо все безпечно, викликаємо оригінальний метод 'create'
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         """
         Автоматично призначаємо поточного користувача при створенні нового завдання.
         """
-        # self.request.user - це залогінений користувач
         serializer.save(user=self.request.user)
 
 
@@ -49,6 +84,9 @@ def agent_heartbeat_view(request):
 
         # Оновлення часу останнього "пульсу"
         stand.last_agent_heartbeat = timezone.now()
+        libraries_list = request.data.get('libraries')
+        if libraries_list is not None:
+            stand.installed_libraries = libraries_list
         stand.save()
 
         return Response({'status': 'heartbeat_received', 'stand_id': stand.id})
@@ -88,3 +126,20 @@ def stand_heartbeat_view(request):
         return Response({'status': 'no_active_stand'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_ERROR)
+# =======================================================
+# 4. VIEWSET ДЛЯ ЗАВДАНЬ ВСТАНОВЛЕННЯ БІБЛІОТЕК
+# =======================================================
+
+class LibraryJobViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint для завдань встановлення бібліотек.
+    """
+    queryset = LibraryJob.objects.all().order_by('-created_at')
+    serializer_class = LibraryJobSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        """
+        Автоматично призначаємо поточного користувача.
+        """
+        serializer.save(user=self.request.user)
