@@ -86,6 +86,13 @@ class LibraryJob(models.Model):
     """
     Модель, що представляє одне завдання на встановлення бібліотеки.
     """
+    JOB_INSTALL = 'install'
+    JOB_UNINSTALL = 'uninstall'
+    JOB_TYPES = [
+        (JOB_INSTALL, 'Встановлення'),
+        (JOB_UNINSTALL, 'Видалення'),
+    ]
+
     STATUS_PENDING = 'pending'
     STATUS_RUNNING = 'running'
     STATUS_COMPLETED = 'completed'
@@ -101,8 +108,15 @@ class LibraryJob(models.Model):
     stand = models.ForeignKey(LabStand, on_delete=models.CASCADE, related_name='lib_jobs')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 
+    job_type = models.CharField(
+        max_length=20,
+        choices=JOB_TYPES,
+        default=JOB_INSTALL
+    )
     # Назва бібліотеки для встановлення
-    library_name = models.CharField(max_length=100)
+    library_name = models.CharField(max_length=100, blank=True, null=True)
+
+    library_zip = models.FileField(upload_to='library_zips/', blank=True, null=True)
 
     status = models.CharField(
         max_length=20,
@@ -116,3 +130,29 @@ class LibraryJob(models.Model):
 
     def __str__(self):
         return f"LibJob #{self.id} for {self.stand.name} ({self.library_name})"
+
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+import os
+
+@receiver(post_save, sender=LibraryJob)
+def auto_delete_file_on_completion(sender, instance, **kwargs):
+    """
+    Автоматично видаляє .zip файл з диска сервера,
+    коли завдання завершується (успішно або з помилкою).
+    """
+    if instance.status in [LibraryJob.STATUS_COMPLETED, LibraryJob.STATUS_FAILED]:
+        if instance.library_zip:
+            if os.path.isfile(instance.library_zip.path):
+                os.remove(instance.library_zip.path)
+                print(f"🧹 [SERVER] Видалено використаний архів: {instance.library_zip.path}")
+
+@receiver(post_delete, sender=LibraryJob)
+def auto_delete_file_on_record_delete(sender, instance, **kwargs):
+    """
+    Видаляє файл з диска, якщо ми видаляємо сам запис про завдання з адмінки.
+    """
+    if instance.library_zip:
+        if os.path.isfile(instance.library_zip.path):
+            os.remove(instance.library_zip.path)
+            print(f"🧹 [SERVER] Запис видалено, архів теж: {instance.library_zip.path}")

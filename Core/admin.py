@@ -13,8 +13,5 @@ class LabStandAdmin(admin.ModelAdmin):
 
 # Реєструємо модель, але тепер з нашими налаштуваннями
 admin.site.register(LabStand, LabStandAdmin)
-
-# --- ДОДАЙТЕ ЦЕЙ РЯДОК ---
-admin.site.register(FlashJob) # 2. Зареєструйте FlashJob
-
+admin.site.register(FlashJob)
 admin.site.register(LibraryJob)
