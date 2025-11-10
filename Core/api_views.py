@@ -143,3 +143,52 @@ class LibraryJobViewSet(viewsets.ModelViewSet):
         Автоматично призначаємо поточного користувача.
         """
         serializer.save(user=self.request.user)
+
+
+class CompileJobViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint для завдань "тільки компіляція".
+    """
+    queryset = CompileJob.objects.all().order_by('-created_at')
+    serializer_class = CompileJobSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        """
+        Перевизначено для додавання валідації коду (лінтера).
+        """
+        code = request.data.get('code_to_compile')  # 1. Беремо 'code_to_compile'
+        stand_id = request.data.get('stand')
+
+        if not code or not stand_id:
+            return Response({'error': 'Відсутній код або ID стенду'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # 2. Перевіряємо правила безпеки стенду
+            stand = LabStand.objects.get(pk=stand_id)
+            rules = stand.validation_rules
+
+            if rules:
+                print(f"🔬(Compile) Запуск лінтера для стенду '{stand.name}' з правилами: {rules}")
+                is_safe, message = validate_code(code, rules)
+
+                if not is_safe:
+                    print(f"🛑(Compile) НЕБЕЗПЕЧНИЙ КОД ЗАБЛОКОВАНО: {message}")
+                    return Response({'error': f"Помилка валідації: {message}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            print("✅(Compile) Код пройшов валідацію.")
+
+        except LabStand.DoesNotExist:
+            return Response({'error': 'Стенд не знайдено'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': f'Внутрішня помилка лінтера: {str(e)}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 3. Якщо все безпечно, викликаємо оригінальний метод 'create'
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        """
+        Автоматично призначаємо поточного користувача.
+        """
+        serializer.save(user=self.request.user)

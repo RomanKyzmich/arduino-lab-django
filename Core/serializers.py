@@ -3,7 +3,7 @@ import os
 import zipfile
 
 from rest_framework import serializers
-from .models import FlashJob, LabStand, LibraryJob
+from .models import FlashJob, LabStand, LibraryJob, CompileJob
 
 
 class FlashJobSerializer(serializers.ModelSerializer):
@@ -81,3 +81,22 @@ class LibraryJobSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Помилка: Завантажений файл не є валідним .zip архівом.")
         except Exception as e:
             raise serializers.ValidationError(f"Помилка валідації ZIP: {e}")
+
+class CompileJobSerializer(serializers.ModelSerializer):
+    """
+    Серіалізатор для моделі CompileJob.
+    """
+    user_username = serializers.CharField(source='user.username', read_only=True)
+
+    class Meta:
+        model = CompileJob
+        fields = [
+            'id',
+            'stand',
+            'user_username',
+            'status',
+            'code_to_compile', # Код для компіляції
+            'output',          # Результат
+            'created_at'
+        ]
+        read_only_fields = ['created_at', 'user_username']

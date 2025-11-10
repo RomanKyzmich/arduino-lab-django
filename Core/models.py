@@ -156,3 +156,42 @@ def auto_delete_file_on_record_delete(sender, instance, **kwargs):
         if os.path.isfile(instance.library_zip.path):
             os.remove(instance.library_zip.path)
             print(f"🧹 [SERVER] Запис видалено, архів теж: {instance.library_zip.path}")
+
+
+# ... (після класу LibraryJob) ...
+
+# 🔽🔽🔽 ДОДАЙТЕ НОВИЙ КЛАС 🔽🔽🔽
+class CompileJob(models.Model):
+    """
+    Модель, що представляє одне завдання на компіляцію коду (без прошивки).
+    """
+    STATUS_PENDING = 'pending'
+    STATUS_RUNNING = 'running'
+    STATUS_COMPLETED = 'completed'
+    STATUS_FAILED = 'failed'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Очікування'),
+        (STATUS_RUNNING, 'Виконується'),
+        (STATUS_COMPLETED, 'Завершено'),
+        (STATUS_FAILED, 'Помилка'),
+    ]
+
+    stand = models.ForeignKey(LabStand, on_delete=models.CASCADE, related_name='compile_jobs')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    # Код, який потрібно скомпілювати
+    code_to_compile = models.TextField()
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING
+    )
+
+    output = models.TextField(blank=True, null=True)  # Результат компіляції
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"CompileJob #{self.id} for {self.stand.name} ({self.status})"

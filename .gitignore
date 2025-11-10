@@ -13,3 +13,5 @@ __pycache__/
 
 # Інший кеш
 .DS_Store
+.env
+.env

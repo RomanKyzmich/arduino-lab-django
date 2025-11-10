@@ -1,42 +1,8 @@
 {% extends 'core/base.html' %}
-
-{% block page_styles %}
-<style>
-    /* ... (всі ваші існуючі стилі: .CodeMirror, .log-monitor) ... */
-    .CodeMirror {
-        height: 450px; 
-        border: 1px solid #444;
-        border-radius: 4px;
-    }
-    .log-monitor {
-        height: 300px;
-        overflow-y: scroll;
-        background: #212529;
-        color: #f8f9fa;
-        font-family: monospace;
-        font-size: 0.85em;
-        padding: 0.5rem;
-    }
-    #file-input {
-        display: none;
-    }
-    .nav-tabs .nav-link {
-        background-color: #333;
-        border-color: #444;
-        color: #ccc;
-    }
-    .nav-tabs .nav-link.active {
-        background-color: #444;
-        border-color: #555;
-        color: #fff;
-    }
-</style>
-{% endblock %}
-
+{% block page_styles %} <style> /* ... (всі ваші стилі) ... */ </style> {% endblock %}
 
 {% block content %}
     <h1 class="mb-3">{{ stand.name }}</h1>
-
     <div class="row">
         <div class="col-md-8">
             <div class="card">
@@ -47,238 +13,58 @@
             <div class="card mt-4">
                 <div class="card-header">Редактор коду (Arduino C++)</div>
                 <div class="card-body">
-                    <textarea id="code-editor" class="form-control" rows="15"
-                              placeholder="Вставте ваш .ino скетч сюди...">void setup() {
-  // put your setup code here, to run once:
+                    <textarea id="code-editor" ... >...</textarea>
 
-}
-
-void loop() {
-  // put your main code here, to run repeatedly:
-
-}</textarea>
                     <div class="mt-3 d-flex align-items-center flex-wrap">
+
                         <button id="flash-button" class="btn btn-success me-2 mb-2" data-stand-id="{{ stand.pk }}">
                             🚀 Прошити стенд
                         </button>
+
+                        <button id="compile-button" class="btn btn-warning me-2 mb-2" data-stand-id="{{ stand.pk }}">
+                            🔧 Скомпілювати
+                        </button>
+
                         <label for="file-input" class="btn btn-info me-2 mb-2">
                             📂 Завантажити .ino
                         </label>
                         <input type="file" id="file-input" accept=".ino">
+
                         <div class="me-3 mb-2">
                             <label for="baud-rate-select" class="form-label-sm mb-0">Швидкість (Baud):</label>
-                            <select id="baud-rate-select" class="form-select form-select-sm" style="width: 120px;">
-                                <option value="300">300</option>
-                                <option value="1200">1200</option>
-                                <option value="2400">2400</option>
-                                <option value="4800">4800</option>
-                                <option value="9600" selected>9600</option>
-                                <option value="19200">19200</option>
-                                <option value="38400">38400</option>
-                                <option value="57600">57600</option>
-                                <option value="115200">115200</option>
-                            </select>
+                            <select id="baud-rate-select" ... > ... </select>
                         </div>
-                        <form id="release-form" method="post" action="{% url 'stand-release' stand.pk %}" class="d-inline ms-auto mb-2">
-                            {% csrf_token %}
+
+                        <form id="release-form" ... >
                             <button type="submit" class="btn btn-danger">
                                 🛑 Завершити роботу
                             </button>
                         </form>
                     </div>
-                </div>
+                    </div>
             </div>
 
             <div class="card mt-4">
-                <div class="card-header">Встановлення бібліотек</div>
-                <div class="card-body">
-
-                    <ul class="nav nav-tabs" id="libInstallTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="by-name-tab" data-bs-toggle="tab" data-bs-target="#by-name" type="button" role="tab" aria-controls="by-name" aria-selected="true">За назвою</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="by-zip-tab" data-bs-toggle="tab" data-bs-target="#by-zip" type="button" role="tab" aria-controls="by-zip" aria-selected="false">Завантажити .zip</button>
-                        </li>
-                    </ul>
-
-                    <div class="tab-content" id="libInstallTabsContent">
-                        
-                        <div class="tab-pane fade show active" id="by-name" role="tabpanel" aria-labelledby="by-name-tab">
-                            <div class="input-group mt-3">
-                                <input type="text" id="lib-install-name" class="form-control" placeholder="Назва бібліотеки (напр. 'Adafruit GFX Library')">
-                                <button class="btn btn-primary" type="button" id="lib-install-button">
-                                    📥 Встановити
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="tab-pane fade" id="by-zip" role="tabpanel" aria-labelledby="by-zip-tab">
-                            <div class="input-group mt-3">
-                                <input type="file" class="form-control" id="lib-zip-input" accept=".zip">
-                                <button class="btn btn-primary" type="button" id="lib-zip-button">
-                                    📥 Завантажити та встановити
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <h6 class="mt-3">Лог встановлення:</h6>
-                    <pre class="log-monitor"><code id="lib-install-monitor">[... очікування дій ...]</code></pre>
                 </div>
-            </div>
-            </div> <div class="col-md-4">
-            {% if stand.video_stream_url %}
-            <div class="card mb-4">
-                <div class="card-header">Відео зі стенду</div>
-                <div class="card-body p-0" style="background: #000;">
-                    <img src="{{ stand.video_stream_url }}" class="img-fluid" alt="Live video feed">
-                </div>
-            </div>
-            {% endif %}
-            
-            <div class="card">
-                <div class="card-header">Статус</div>
-                <div class="card-body">
-                    {% if stand.is_busy %}
-                        <h5 class="text-danger">🔴 Зайнятий</h5>
-                        <p>Ким: {{ stand.current_user.username|default:"Невідомо" }}</p>
-                    {% else %}
-                        <h5 class="text-success">🟢 Вільний</h5>
-                    {% endif %}
-                    <p><strong>Порт:</strong> {{ stand.port }}</p>
-                </div>
-            </div>
 
-            {% if stand.schema_image %}
-                <div class="card mt-4">
-                    <div class="card-header">Електрична схема</div>
-                    <div class="card-body p-0">
-                        <a href="{{ stand.schema_image.url }}" target="_blank">
-                            <img src="{{ stand.schema_image.url }}" class="img-fluid" alt="Електрична схема стенду">
-                        </a>
-                    </div>
-                    <div class="card-footer text-muted small">
-                        Натисніть на зображення, щоб відкрити у повному розмірі.
-                    </div>
-                </div>
-            {% else %}
-                <div class="card mt-4">
-                    <div class="card-header">Електрична схема</div>
-                    <div class="card-body">
-                        <p class="text-muted small mb-0">Схема не завантажена.</p>
-                    </div>
-                </div>
-            {% endif %}
-
-            <div class="card mt-4">
-                <div class="card-header">Встановлені бібліотеки</div>
-                <div class="card-body" style="height: 200px; overflow-y: scroll;">
-                    {% if stand.is_agent_online %}
-                        <ul class="list-unstyled small" id="installed-libs-list">
-                        {% for lib_name in stand.installed_libraries %}
-                            <li class="d-flex justify-content-between align-items-center mb-1">
-                                <strong>{{ lib_name }}</strong>
-                                <button class="btn btn-danger btn-sm py-0 px-2 uninstall-lib-button" 
-                                        data-lib-name="{{ lib_name }}" 
-                                        title="Видалити бібліотеку">
-                                    &times;
-                                </button>
-                            </li>
-                        {% empty %}
-                             <li>Список порожній.</li>
-                        {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="small text-muted">Агент офлайн. Список буде доступний, коли він підключиться.</p>
-                    {% endif %}
-                </div>
-            </div>
-
+        </div> <div class="col-md-4">
             <div class="card mt-4">
                 <div class="card-header">Монітор порту / Лог прошивки</div>
                 <pre class="log-monitor"><code id="port-monitor">[... очікування дій ...]</code></pre>
             </div>
         </div>
-    </div> 
+    </div>
 {% endblock %}
 
 
 {% block page_scripts %}
 <script>
-    // ... (Функції getCookie, pollJobStatus, sendHeartbeat, sendJob - без змін) ...
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
+    // ... (всі існуючі функції: getCookie, pollJobStatus, sendHeartbeat, sendJob) ...
+    function getCookie(name) { /* ... */ }
     const csrftoken = getCookie('csrftoken');
-    
-    function pollJobStatus(jobId, monitorElement, endpoint, onDoneCallback = null) {
-        const intervalId = setInterval(() => {
-            fetch(`${endpoint}${jobId}/`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
-            })
-            .then(response => response.json())
-            .then(data => {
-                const status = data.status;
-                const output = data.output || "";
-                
-                if (status === 'completed' || status === 'failed') {
-                    clearInterval(intervalId); 
-                    monitorElement.textContent = `--- ЗАВДАННЯ #${jobId} ЗАВЕРШЕНО (Статус: ${status}) ---\n\n${output}`;
-                    if (onDoneCallback) onDoneCallback();
-
-                } else if (status === 'running') {
-                    monitorElement.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} виконується...\n\n(Агент повідомляє: ${output || '...'})`;
-                } else {
-                    monitorElement.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} в черзі, очікує на агента...`;
-                }
-            })
-            .catch(error => {
-                console.error('Помилка при опитуванні:', error);
-                clearInterval(intervalId);
-                monitorElement.textContent = `ПОМИЛКА опитування завдання #${jobId}. ${error}`;
-                if (onDoneCallback) onDoneCallback();
-            });
-        }, 2000); 
-    }
-
-    function sendHeartbeat() {
-        fetch('/api/heartbeat/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
-        })
-        .catch(error => console.error('Error sending heartbeat:', error));
-    }
-    
-    function sendJob(endpoint, payload, monitorElement) {
-        monitorElement.textContent = '[...] Створюємо завдання...';
-        return fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(response => {
-            if (!response.ok) { 
-                return response.json().then(err => { throw new Error(JSON.stringify(err)); });
-            }
-            return response.json();
-        });
-    }
+    function pollJobStatus(jobId, monitorElement, endpoint, onDoneCallback = null) { /* ... */ }
+    function sendHeartbeat() { /* ... */ }
+    function sendJob(endpoint, payload, monitorElement) { /* ... */ }
 
     // ==========================================================
     // --- ОСНОВНИЙ СКРИПТ (DOMContentLoaded) ---
@@ -286,230 +72,103 @@ void loop() {
     document.addEventListener('DOMContentLoaded', (event) => {
         // --- 1. Знаходимо елементи ---
         const flashButton = document.getElementById('flash-button');
+        // 🔽🔽🔽 1. ЗНАЙДІТЬ НОВУ КНОПКУ 🔽🔽🔽
+        const compileButton = document.getElementById('compile-button');
+
         const codeEditorElement = document.getElementById('code-editor');
         const portMonitor = document.getElementById('port-monitor');
-        const releaseForm = document.getElementById('release-form'); 
-        const fileInput = document.getElementById('file-input');
-        
-        // Елементи бібліотек
-        const libInstallButton = document.getElementById('lib-install-button');
-        const libInstallName = document.getElementById('lib-install-name');
-        const libInstallMonitor = document.getElementById('lib-install-monitor');
-        const libZipButton = document.getElementById('lib-zip-button');
-        const libZipInput = document.getElementById('lib-zip-input');
-        const installedLibsList = document.getElementById('installed-libs-list');
-        
+        // ... (решта елементів: releaseForm, fileInput, lib...)
+
         const standId = flashButton.dataset.standId;
         const localStorageKey = `lab-code-stand-${standId}`;
 
         // --- 2. ІНІЦІАЛІЗАЦІЯ CODEMIRROR ---
-        const editor = CodeMirror.fromTextArea(codeEditorElement, {
-            lineNumbers: true,
-            mode: "text/x-c++src",
-            theme: "dracula",
-            indentUnit: 2,
-            tabSize: 2
-        });
-        
+        const editor = CodeMirror.fromTextArea(codeEditorElement, { /* ... */ });
+
         // --- 3. ЗАВАНТАЖЕННЯ ЗБЕРЕЖЕНОГО КОДУ ---
         const savedCode = localStorage.getItem(localStorageKey);
         if (savedCode) { editor.setValue(savedCode); }
 
         // --- 4. ПРИВ'ЯЗКА ПОДІЙ ---
-        
+
         // 4.1 ЗБЕРЕЖЕННЯ КОДУ
-        let saveTimeout;
-        editor.on('change', () => {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => {
-                const currentCode = editor.getValue();
-                localStorage.setItem(localStorageKey, currentCode);
-            }, 500);
-        });
+        // ... (без змін) ...
 
         // 4.2 "Слухач" кнопки "Прошити" (FLASH)
         flashButton.addEventListener('click', () => {
-            // ... (код прошивки без змін) ...
-            const code = editor.getValue(); 
+            const code = editor.getValue();
             const baudRate = document.getElementById('baud-rate-select').value;
             if (!code.trim()) { alert('Поле коду не може бути порожнім!'); return; }
+
+            // Блокуємо ОБИДВІ кнопки
             flashButton.disabled = true;
-            flashButton.textContent = 'Завдання відправлено...';
+            compileButton.disabled = true;
             editor.setOption("readOnly", true);
+
             const payload = {
-                'stand': standId, 'code_to_flash': code, 'status': 'pending', 'baud_rate': parseInt(baudRate, 10)
+                'stand': standId,
+                'code_to_flash': code, // <--- code_to_flash
+                'status': 'pending',
+                'baud_rate': parseInt(baudRate, 10)
             };
+
+            // Використовуємо 'port-monitor' для логів
             sendJob('/api/jobs/', payload, portMonitor)
                 .then(data => {
-                    portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Очікуємо...`;
+                    portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} (Прошивка) створено. Очікуємо...`;
                     pollJobStatus(data.id, portMonitor, '/api/jobs/', () => {
+                        // onDone
                         flashButton.disabled = false;
-                        flashButton.textContent = '🚀 Прошити стенд';
+                        compileButton.disabled = false;
                         editor.setOption("readOnly", false);
                     });
                 })
-                .catch(error => {
-                    try { const errData = JSON.parse(error.message);
-                        portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${errData.error}`;
-                    } catch(e) { portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`; }
-                    flashButton.disabled = false;
-                    flashButton.textContent = '🚀 Прошити стенд';
-                    editor.setOption("readOnly", false);
-                });
+                .catch(error => { /* ... (обробка помилок) ... */ });
         });
-        
-        // 4.3 "Слухач" кнопки "Встановити бібліотеку (ЗА НАЗВОЮ)"
-        if (libInstallButton) {
-            libInstallButton.addEventListener('click', () => {
-                const libraryName = libInstallName.value.trim();
-                if (!libraryName) { alert('Введіть назву бібліотеки!'); return; }
-                
-                libInstallButton.disabled = true;
-                libZipButton.disabled = true;
-                document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = true);
-                
+
+        // 🔽🔽🔽 4.3 НОВИЙ "СЛУХАЧ" ДЛЯ КОМПІЛЯЦІЇ 🔽🔽🔽
+        if (compileButton) {
+            compileButton.addEventListener('click', () => {
+                const code = editor.getValue();
+                if (!code.trim()) { alert('Поле коду не може бути порожнім!'); return; }
+
+                // Блокуємо ОБИДВІ кнопки
+                flashButton.disabled = true;
+                compileButton.disabled = true;
+                editor.setOption("readOnly", true); // Блокуємо редактор
+
                 const payload = {
-                    'stand': standId, 'library_name': libraryName, 'status': 'pending'
+                    'stand': standId,
+                    'code_to_compile': code, // <--- code_to_compile
+                    'status': 'pending'
                 };
-                
-                sendJob('/api/lib-jobs/', payload, libInstallMonitor)
+
+                // Використовуємо той самий 'port-monitor' для логів
+                sendJob('/api/compile-jobs/', payload, portMonitor)
                     .then(data => {
-                        libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Встановлюємо '${data.library_name}'...`;
-                        pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
+                        portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} (Компіляція) створено. Очікуємо...`;
+                        pollJobStatus(data.id, portMonitor, '/api/compile-jobs/', () => {
                             // onDone
-                            location.reload(); // ✅ ПОВЕРТАЄМО ПЕРЕЗАВАНТАЖЕННЯ
+                            flashButton.disabled = false;
+                            compileButton.disabled = false;
+                            editor.setOption("readOnly", false); // Розблоковуємо редактор
                         });
                     })
                     .catch(error => {
-                        libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`;
-                        libInstallButton.disabled = false;
-                        libZipButton.disabled = false;
-                        document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = false);
+                        try { const errData = JSON.parse(error.message);
+                            portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${errData.error}`;
+                        } catch(e) { portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`; }
+
+                        flashButton.disabled = false;
+                        compileButton.disabled = false;
+                        editor.setOption("readOnly", false);
                     });
             });
         }
 
-        // 4.4 "Слухач" ДЛЯ ВСТАНОВЛЕННЯ (З ZIP)
-        if (libZipButton) {
-            libZipButton.addEventListener('click', () => {
-                const file = libZipInput.files[0];
-                if (!file) { alert('Будь ласка, виберіть .zip файл для завантаження.'); return; }
-                
-                libInstallButton.disabled = true;
-                libZipButton.disabled = true;
-                document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = true);
-                libInstallMonitor.textContent = '[...] Завантаження .zip файлу на сервер...';
+        // ... (решта слухачів: 4.4 Lib Install (Name), 4.5 Lib Install (ZIP), 4.6 Lib Uninstall, 4.7 Release Form, 4.8 Heartbeat, 4.9 .ino Upload) ...
+        // (Переконайтеся, що їхні номери тепер зміщені)
 
-                const formData = new FormData();
-                formData.append('stand', standId);
-                formData.append('status', 'pending');
-                formData.append('library_zip', file);
-
-                fetch('/api/lib-jobs/', {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrftoken },
-                    body: formData
-                })
-                .then(response => {
-                    if (!response.ok) { 
-                        return response.json().then(err => { throw new Error(JSON.stringify(err)); });
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Встановлюємо з архіву...`;
-                    pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
-                        // onDone
-                        location.reload(); // ✅ ПОВЕРТАЄМО ПЕРЕЗАВАНТАЖЕННЯ
-                    });
-                })
-                .catch(error => {
-                    libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`;
-                    libInstallButton.disabled = false;
-                    libZipButton.disabled = false;
-                    document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = false);
-                });
-            });
-        }
-        
-        // 4.5 "СЛУХАЧ" ДЛЯ КНОПОК "ВИДАЛИТИ"
-        if (installedLibsList) {
-            installedLibsList.addEventListener('click', function(e) {
-                if (e.target.classList.contains('uninstall-lib-button')) {
-                    
-                    const libButton = e.target;
-                    const libName = libButton.dataset.libName;
-                    
-                    if (!libName || !confirm(`Ви впевнені, що хочете видалити бібліотеку "${libName}"?`)) {
-                        return;
-                    }
-
-                    console.log(`Запит на видалення: ${libName}`);
-                    
-                    libInstallButton.disabled = true;
-                    libZipButton.disabled = true;
-                    document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = true);
-
-                    const payload = {
-                        'stand': standId,
-                        'library_name': libName,
-                        'job_type': 'uninstall',
-                        'status': 'pending'
-                    };
-                    
-                    sendJob('/api/lib-jobs/', payload, libInstallMonitor)
-                        .then(data => {
-                            libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Видалення '${data.library_name}'...`;
-                            pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
-                                // onDone
-                                location.reload(); // ✅ ПОВЕРТАЄМО ПЕРЕЗАВАНТАЖЕННЯ
-                            });
-                        })
-                        .catch(error => {
-                            libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`;
-                            libInstallButton.disabled = false;
-                            libZipButton.disabled = false;
-                            document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = false);
-                        });
-                }
-            });
-        }
-        
-        // 4.6 ОЧИЩЕННЯ СХОВИЩА ПРИ ВИХОДІ
-        if (releaseForm) {
-            releaseForm.addEventListener('submit', () => {
-                localStorage.removeItem(localStorageKey);
-            });
-        }
-
-        // 4.7 Запуск "Пульсу"
-        setInterval(sendHeartbeat, 60000); // 1 хвилина
-
-        // 4.8 "СЛУХАЧ" ДЛЯ ЗАВАНТАЖЕННЯ .INO
-        if (fileInput) {
-            fileInput.addEventListener('change', (e) => {
-                // ... (код завантаження .ino без змін) ...
-                const file = e.target.files[0];
-                if (!file) { return; }
-                if (!file.name.endsWith('.ino')) {
-                    alert('Будь ласка, завантажуйте лише .ino файли');
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const fileContent = event.target.result;
-                    editor.setValue(fileContent);
-                    localStorage.setItem(localStorageKey, fileContent);
-                };
-                reader.onerror = (event) => {
-                    alert('Не вдалося прочитати файл.');
-                    console.error("Помилка FileReader:", event);
-                };
-                reader.readAsText(file);
-                e.target.value = null;
-            });
-        }
-        
     });
 </script>
 {% endblock %}

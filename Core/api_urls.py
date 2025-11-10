@@ -8,7 +8,7 @@ router = DefaultRouter()
 # Реєструємо наш ViewSet.
 router.register(r'jobs', api_views.FlashJobViewSet, basename='job')
 router.register(r'lib-jobs', api_views.LibraryJobViewSet, basename='lib-job')
-
+router.register(r'compile-jobs', api_views.CompileJobViewSet, basename='compile-job')
 # Наші URL-адреси API
 urlpatterns = [
     path('', include(router.urls)),
