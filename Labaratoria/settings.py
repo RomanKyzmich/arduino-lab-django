@@ -31,6 +31,7 @@ ALLOWED_HOSTS = ['178.20.158.192']
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -72,6 +73,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'Labaratoria.wsgi.application'
+ASGI_APPLICATION = 'Labaratoria.asgi.application'
 
 
 # Database
@@ -114,7 +116,15 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
+# Налаштування для Django Channels
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)], # Використовуємо Redis, який має бути запущений на сервері
+        },
+    },
+}
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
