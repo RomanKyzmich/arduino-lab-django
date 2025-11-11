@@ -1,24 +1,27 @@
-# В файлі Labaratoria/asgi.py
-
 import os
-from django.core.asgi import get_asgi_application
+import django
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-import Core.routing # <--- Імпортуємо наші майбутні WebSocket-маршрути
+from channels.sessions import SessionMiddlewareStack
+from django.core.handlers.asgi import ASGIHandler
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Labaratoria.settings')
 
-# Отримуємо звичайний HTTP-додаток
-django_asgi_app = get_asgi_application()
+django.setup()
+
+from Core.token_auth import TokenAuthMiddleware
+import Core.routing
+from Labaratoria.wsgi import application as wsgi_app_with_whitenoise  # можеш залишити, якщо потрібно для Gunicorn WSGI
 
 application = ProtocolTypeRouter({
-    # 1. Обробка HTTP-запитів (так само, як і раніше)
-    "http": django_asgi_app,
+    # ✅ ASGIHandler не приймає аргументів
+    "http": ASGIHandler(),
 
-    # 2. Обробка WebSocket-запитів
-    "websocket": AuthMiddlewareStack( # Дозволяє нам бачити 'user' у WebSocket
-        URLRouter(
-            Core.routing.websocket_urlpatterns # Вказуємо, де шукати маршрути
+    "websocket": SessionMiddlewareStack(
+        TokenAuthMiddleware(
+            AuthMiddlewareStack(
+                URLRouter(Core.routing.websocket_urlpatterns)
+            )
         )
     ),
 })

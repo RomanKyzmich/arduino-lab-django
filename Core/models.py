@@ -7,7 +7,7 @@ from datetime import timedelta
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 
-schema_storage = FileSystemStorage(location=os.path.join(settings.BASE_DIR, 'media', 'schemas'))
+
 
 class LabStand(models.Model):
     name = models.CharField(max_length=100)
@@ -21,8 +21,21 @@ class LabStand(models.Model):
     last_agent_heartbeat = models.DateTimeField(null=True, blank=True)
     installed_libraries = models.JSONField(default=list, blank=True)
     validation_rules = models.JSONField(default=dict, blank=True)
-    schema_image = models.ImageField(upload_to='schemas/', blank=True, null=True, storage=schema_storage,
-                                     help_text="Зображення електричної схеми стенду")
+    schema_image = models.ImageField(
+        upload_to='schemas/', # <-- Залишаємо 'schemas/'
+        blank=True, 
+        null=True,
+        help_text="Зображення електричної схеми стенду"
+   )
+
+
+
+
+
+
+
+
+
 
 
     @property
@@ -48,12 +61,14 @@ class FlashJob(models.Model):
     STATUS_RUNNING = 'running'
     STATUS_COMPLETED = 'completed'
     STATUS_FAILED = 'failed'
+    STATUS_CANCELLING = 'cancelling'
 
     STATUS_CHOICES = [
         (STATUS_PENDING, 'Очікування'),
         (STATUS_RUNNING, 'Виконується'),
         (STATUS_COMPLETED, 'Завершено'),
         (STATUS_FAILED, 'Помилка'),
+	(STATUS_CANCELLING, 'Скасування'),
     ]
 
     # До якого стенду це завдання?
@@ -169,12 +184,14 @@ class CompileJob(models.Model):
     STATUS_RUNNING = 'running'
     STATUS_COMPLETED = 'completed'
     STATUS_FAILED = 'failed'
+    STATUS_CANCELLING = 'cancelling'
 
     STATUS_CHOICES = [
         (STATUS_PENDING, 'Очікування'),
         (STATUS_RUNNING, 'Виконується'),
         (STATUS_COMPLETED, 'Завершено'),
         (STATUS_FAILED, 'Помилка'),
+	(STATUS_CANCELLING, 'Скасування'),
     ]
 
     stand = models.ForeignKey(LabStand, on_delete=models.CASCADE, related_name='compile_jobs')

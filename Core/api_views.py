@@ -4,8 +4,8 @@ from rest_framework.response import Response
 from django.utils import timezone
 from .linter import validate_code
 # ⚠️ ПЕРЕКОНАЙТЕСЯ, ЩО ЦІ МОДЕЛІ ІМПОРТОВАНІ
-from .models import FlashJob, LabStand, LibraryJob
-from .serializers import FlashJobSerializer, LibraryJobSerializer
+from .models import FlashJob, LabStand, LibraryJob, CompileJob
+from .serializers import FlashJobSerializer, LibraryJobSerializer, CompileJobSerializer
 
 
 # =======================================================
@@ -192,3 +192,45 @@ class CompileJobViewSet(viewsets.ModelViewSet):
         Автоматично призначаємо поточного користувача.
         """
         serializer.save(user=self.request.user)
+
+
+# В Core/api_views.py
+# ... (всі імпорти, включаючи 'status', 'api_view', 'Response', 'CompileJob')
+
+# ... (в кінці файлу, після CompileJobViewSet) ...
+
+# =======================================================
+# 6. API ДЛЯ СКАСУВАННЯ ЗАВДАНЬ
+# =======================================================
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def cancel_flash_job(request, pk):
+    """
+    Встановлює статус 'cancelling' для завдання FlashJob.
+    """
+    try:
+        job = FlashJob.objects.get(pk=pk, user=request.user)
+        if job.status in [FlashJob.STATUS_PENDING, FlashJob.STATUS_RUNNING]:
+            job.status = FlashJob.STATUS_CANCELLING
+            job.save()
+            return Response({'status': 'cancellation_requested'}, status=status.HTTP_2_0_OK)
+        return Response({'error': 'Job cannot be cancelled'}, status=status.HTTP_4_0_BAD_REQUEST)
+    except FlashJob.DoesNotExist:
+        return Response(status=status.HTTP_4_0_NOT_FOUND)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def cancel_compile_job(request, pk):
+    """
+    Встановлює статус 'cancelling' для завдання CompileJob.
+    """
+    try:
+        job = CompileJob.objects.get(pk=pk, user=request.user)
+        if job.status in [CompileJob.STATUS_PENDING, CompileJob.STATUS_RUNNING]:
+            job.status = CompileJob.STATUS_CANCELLING
+            job.save()
+            return Response({'status': 'cancellation_requested'}, status=status.HTTP_2_0_OK)
+        return Response({'error': 'Job cannot be cancelled'}, status=status.HTTP_4_0_BAD_REQUEST)
+    except CompileJob.DoesNotExist:
+        return Response(status=status.HTTP_4_0_NOT_FOUND)

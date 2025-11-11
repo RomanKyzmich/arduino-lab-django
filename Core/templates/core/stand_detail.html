@@ -2,24 +2,27 @@
 
 {% block page_styles %}
 <style>
-    /* ... (всі ваші існуючі стилі: .CodeMirror, .log-monitor) ... */
+    /* Встановлюємо висоту та стилі для редактора CodeMirror */
     .CodeMirror {
-        height: 450px;
+        height: 450px; 
         border: 1px solid #444;
         border-radius: 4px;
     }
+    /* Стиль для логів (pre) */
     .log-monitor {
-        height: 300px;
+        height: 300px; /* Ви можете збільшити це, наприклад, до 400px */
         overflow-y: scroll;
-        background: #212529;
-        color: #f8f9fa;
+        background: #212529; /* bg-dark */
+        color: #f8f9fa; /* text-light */
         font-family: monospace;
         font-size: 0.85em;
         padding: 0.5rem;
     }
+    /* Ховаємо стандартний input[type=file] */
     #file-input {
         display: none;
     }
+    /* Стилі для Табів */
     .nav-tabs .nav-link {
         background-color: #333;
         border-color: #444;
@@ -41,7 +44,7 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">Опис стенду</div>
-                <div class="card-body"><p>{{ stand.description }}</p></div>
+                <div class="card-body"><p>{{ stand.description|default:"Опис відсутній." }}</p></div>
             </div>
 
             <div class="card mt-4">
@@ -57,18 +60,26 @@ void loop() {
   // put your main code here, to run repeatedly:
 
 }</textarea>
-
+                    
                     <div class="mt-3 d-flex align-items-center flex-wrap">
+                        
                         <button id="flash-button" class="btn btn-success me-2 mb-2" data-stand-id="{{ stand.pk }}">
                             🚀 Прошити стенд
                         </button>
+                        
                         <button id="compile-button" class="btn btn-warning me-2 mb-2" data-stand-id="{{ stand.pk }}">
                             🔧 Скомпілювати
                         </button>
+
+                        <button id="cancel-button" class="btn btn-danger me-2 mb-2" data-stand-id="{{ stand.pk }}" style="display: none;">
+                            ❌ Скасувати
+                        </button>
+                        
                         <label for="file-input" class="btn btn-info me-2 mb-2">
                             📂 Завантажити .ino
                         </label>
                         <input type="file" id="file-input" accept=".ino">
+                        
                         <div class="me-3 mb-2">
                             <label for="baud-rate-select" class="form-label-sm mb-0">Швидкість (Baud):</label>
                             <select id="baud-rate-select" class="form-select form-select-sm" style="width: 120px;">
@@ -83,6 +94,7 @@ void loop() {
                                 <option value="115200">115200</option>
                             </select>
                         </div>
+
                         <form id="release-form" method="post" action="{% url 'stand-release' stand.pk %}" class="d-inline ms-auto mb-2">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-danger">
@@ -94,16 +106,45 @@ void loop() {
             </div>
 
             <div class="card mt-4">
+                <div class="card-header">Встановлення бібліотек</div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs" id="libInstallTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="by-name-tab" data-bs-toggle="tab" data-bs-target="#by-name" type="button" role="tab" aria-controls="by-name" aria-selected="true">За назвою</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="by-zip-tab" data-bs-toggle="tab" data-bs-target="#by-zip" type="button" role="tab" aria-controls="by-zip" aria-selected="false">Завантажити .zip</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="libInstallTabsContent">
+                        <div class="tab-pane fade show active" id="by-name" role="tabpanel" aria-labelledby="by-name-tab">
+                            <div class="input-group mt-3">
+                                <input type="text" id="lib-install-name" class="form-control" placeholder="Назва бібліотеки (напр. 'Adafruit GFX Library')">
+                                <button class="btn btn-primary" type="button" id="lib-install-button">
+                                    📥 Встановити
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="by-zip" role="tabpanel" aria-labelledby="by-zip-tab">
+                            <div class="input-group mt-3">
+                                <input type="file" class="form-control" id="lib-zip-input" accept=".zip">
+                                <button class="btn btn-primary" type="button" id="lib-zip-button">
+                                    📥 Завантажити та встановити
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <h6 class="mt-3">Лог встановлення:</h6>
+                    <pre class="log-monitor"><code id="lib-install-monitor">[... очікування дій ...]</code></pre>
                 </div>
+            </div>
 
-        </div> <div class="col-md-4">
             <div class="card mt-4">
                 <div class="card-header">Монітор порту / Лог прошивки</div>
                 <pre class="log-monitor"><code id="port-monitor">[... очікування дій ...]</code></pre>
-
                 <div class="card-body border-top p-2">
                     <div class="input-group">
-                        <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary"
+                        <input type="text" class="form-control form-control-sm" 
                                id="serial-input" placeholder="Надіслати в Serial..." disabled>
                         <button class="btn btn-primary btn-sm" type="button" id="serial-send-button" disabled>
                             Надіслати
@@ -111,31 +152,124 @@ void loop() {
                     </div>
                 </div>
             </div>
+            </div> <div class="col-md-4">
+            {% if stand.video_stream_url %}
+            <div class="card mb-4">
+                <div class="card-header">Відео зі стенду</div>
+                <div class="card-body p-0" style="background: #000;">
+                    <img src="{{ stand.video_stream_url }}" class="img-fluid" alt="Live video feed">
+                </div>
             </div>
-    </div>
+            {% endif %}
+            
+            <div class="card">
+                <div class="card-header">Статус</div>
+                <div class="card-body">
+                    {% if stand.is_busy %}
+                        <h5 class="text-danger">🔴 Зайнятий</h5>
+                        <p>Ким: {{ stand.current_user.username|default:"Невідомо" }}</p>
+                    {% else %}
+                        <h5 class="text-success">🟢 Вільний</h5>
+                    {% endif %}
+                    <p><strong>Порт:</strong> {{ stand.port }}</p>
+                </div>
+            </div>
+
+            {% if stand.schema_image %}
+                <div class="card mt-4">
+                    <div class="card-header">Електрична схема</div>
+                    <div class="card-body p-0">
+                        <a href="{{ stand.schema_image.url }}" target="_blank">
+                            <img src="{{ stand.schema_image.url }}" class="img-fluid" alt="Електрична схема стенду">
+                        </a>
+                    </div>
+                    <div class="card-footer text-muted small">
+                        Натисніть на зображення, щоб відкрити у повному розмірі.
+                    </div>
+                </div>
+            {% else %}
+                <div class="card mt-4">
+                    <div class="card-header">Електрична схема</div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-0">Схема не завантажена.</p>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="card mt-4">
+                <div class="card-header">Встановлені бібліотеки</div>
+                <div class="card-body" style="height: 200px; overflow-y: scroll;">
+                    {% if stand.is_agent_online %}
+                        <ul class="list-unstyled small" id="installed-libs-list">
+                        {% for lib_name in stand.installed_libraries %}
+                            <li class="d-flex justify-content-between align-items-center mb-1">
+                                <strong>{{ lib_name }}</strong>
+                                <button class="btn btn-danger btn-sm py-0 px-2 uninstall-lib-button" 
+                                        data-lib-name="{{ lib_name }}" 
+                                        title="Видалити бібліотеку">
+                                    &times;
+                                </button>
+                            </li>
+                        {% empty %}
+                             <li>Список порожній.</li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="small text-muted">Агент офлайн. Список буде доступний, коли він підключиться.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            </div>
+    </div> 
 {% endblock %}
 
 
 {% block page_scripts %}
 <script>
-    // ... (Функції getCookie, pollJobStatus, sendHeartbeat, sendJob - без змін) ...
-    function getCookie(name) { /* ... */ }
+    // --- 🔽🔽🔽 ВЕСЬ JAVASCRIPT БЕЗ ЗМІН 🔽🔽🔽 ---
+    // (Включаючи getCookie, pollJobStatus, sendHeartbeat, sendJob,
+    //  connectWebSocket, sendSerialData, та весь DOMContentLoaded)
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
     const csrftoken = getCookie('csrftoken');
+    
     function pollJobStatus(jobId, monitorElement, endpoint, onDoneCallback = null) {
         const intervalId = setInterval(() => {
             fetch(`${endpoint}${jobId}/`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (response.status === 404) {
+                    console.warn(`[Poll] Завдання #${jobId} не знайдено (можливо, скасовано). Зупинка.`);
+                    clearInterval(intervalId);
+                    return; 
+                }
+                return response.json();
+            })
             .then(data => {
+                if (!data) return; 
+                
                 const status = data.status;
                 const output = data.output || "";
-
-                if (status === 'completed' || status === 'failed') {
-                    clearInterval(intervalId);
+                
+                if (status === 'completed' || status === 'failed' || status === 'cancelling') {
+                    clearInterval(intervalId); 
                     monitorElement.textContent = `--- ЗАВДАННЯ #${jobId} ЗАВЕРШЕНО (Статус: ${status}) ---\n\n${output}`;
-                    if (onDoneCallback) onDoneCallback(status === 'completed'); // Передаємо 'success'
+                    if (onDoneCallback) onDoneCallback(status === 'completed'); 
 
                 } else if (status === 'running') {
                     monitorElement.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${jobId} виконується...\n\n(Агент повідомляє: ${output || '...'})`;
@@ -144,35 +278,56 @@ void loop() {
                 }
             })
             .catch(error => {
-                console.error('Помилка при опитуванні:', error);
+                console.error('Помилка при опитуванні (або завдання скасовано):', error);
                 clearInterval(intervalId);
-                monitorElement.textContent = `ПОМИЛКА опитування завдання #${jobId}. ${error}`;
-                if (onDoneCallback) onDoneCallback(false); // Завдання провалилось
             });
-        }, 2000);
+            
+        }, 2000); 
+        
+        return intervalId;
     }
-    function sendHeartbeat() { /* ... */ }
-    function sendJob(endpoint, payload, monitorElement) { /* ... */ }
 
+    function sendHeartbeat() {
+        fetch('/api/heartbeat/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
+        })
+        .catch(error => console.error('Error sending heartbeat:', error));
+    }
+    
+    function sendJob(endpoint, payload, monitorElement) {
+        monitorElement.textContent = '[...] Створюємо завдання...';
+        return fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) { 
+                return response.json().then(err => { throw new Error(JSON.stringify(err)); });
+            }
+            return response.json();
+        });
+    }
 
-    // 🔽🔽🔽 --- 5. НОВА ЛОГІКА WEBSOCKET --- 🔽🔽🔽
+    
     let serialSocket = null;
     const portMonitor = document.getElementById('port-monitor');
     const serialInput = document.getElementById('serial-input');
     const serialSendButton = document.getElementById('serial-send-button');
 
     function connectWebSocket(standId) {
-        // Закриваємо старе з'єднання, якщо воно є
         if (serialSocket) {
-            serialSocket.onclose = () => {}; // Вимикаємо 'onclose'
+            serialSocket.onclose = () => {}; 
             serialSocket.close();
         }
 
-        // Визначаємо безпечний 'wss://' або 'ws://'
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Використовуємо 'remote-lab.port0.org' замість '178.20...'
         const wsUrl = `${protocol}//${window.location.host}/ws/serial/${standId}/`;
-
+        
         console.log(`[WS] Підключення до ${wsUrl}...`);
         portMonitor.textContent += `\n[WebSocket] Підключення до монітора порту...`;
 
@@ -181,7 +336,6 @@ void loop() {
         serialSocket.onopen = (e) => {
             console.log('[WS] З\'єднання відкрито');
             portMonitor.textContent += `\n[WebSocket] Підключено!`;
-            // Вмикаємо поле вводу
             serialInput.disabled = false;
             serialSendButton.disabled = false;
         };
@@ -189,16 +343,13 @@ void loop() {
         serialSocket.onclose = (e) => {
             console.log('[WS] З\'єднання закрито.', e.reason);
             portMonitor.textContent += `\n[WebSocket] Монітор порту відключено.`;
-            // Вимикаємо поле вводу
             serialInput.disabled = true;
             serialSendButton.disabled = true;
         };
 
         serialSocket.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            // Додаємо дані з Arduino у монітор
             portMonitor.textContent += data.message;
-            // Авто-прокрутка вниз
             portMonitor.scrollTop = portMonitor.scrollHeight;
         };
 
@@ -212,209 +363,357 @@ void loop() {
         if (serialSocket && serialSocket.readyState === WebSocket.OPEN) {
             const message = serialInput.value;
             if (message === "") return;
-
-            // Надсилаємо повідомлення на сервер (який перешле його агенту)
+            
             serialSocket.send(JSON.stringify({
-                'message': message + '\n', // Додаємо '\n' для Arduino
+                'message': message + '\n', 
                 'sender': 'user'
             }));
-
-            // Очищуємо поле вводу
+            
             serialInput.value = '';
         } else {
             alert('WebSocket не підключено.');
         }
     }
-    // 🔼🔼🔼 --- КІНЕЦЬ ЛОГІКИ WEBSOCKET --- 🔼🔼🔼
 
 
-    // ==========================================================
-    // --- ОСНОВНИЙ СКРИПТ (DOMContentLoaded) ---
-    // ==========================================================
     document.addEventListener('DOMContentLoaded', (event) => {
-        // --- 1. Знаходимо елементи ---
         const flashButton = document.getElementById('flash-button');
         const compileButton = document.getElementById('compile-button');
+        const cancelButton = document.getElementById('cancel-button');
+        
         const codeEditorElement = document.getElementById('code-editor');
-        const releaseForm = document.getElementById('release-form');
+        const releaseForm = document.getElementById('release-form'); 
         const fileInput = document.getElementById('file-input');
-
+        
         const libInstallButton = document.getElementById('lib-install-button');
         const libInstallName = document.getElementById('lib-install-name');
         const libInstallMonitor = document.getElementById('lib-install-monitor');
         const libZipButton = document.getElementById('lib-zip-button');
         const libZipInput = document.getElementById('lib-zip-input');
         const installedLibsList = document.getElementById('installed-libs-list');
-
+        
         const standId = flashButton.dataset.standId;
         const localStorageKey = `lab-code-stand-${standId}`;
 
-        // --- 2. ІНІЦІАЛІЗАЦІЯ CODEMIRROR ---
-        const editor = CodeMirror.fromTextArea(codeEditorElement, { /* ... */ });
+        let activeJobId = null;
+        let activeJobEndpoint = null;
+        let activeJobInterval = null;
 
-        // --- 3. ЗАВАНТАЖЕННЯ ЗБЕРЕЖЕНОГО КОДУ ---
+        const editor = CodeMirror.fromTextArea(codeEditorElement, {
+            lineNumbers: true,
+            mode: "text/x-c++src",
+            theme: "dracula",
+            indentUnit: 2,
+            tabSize: 2
+        });
+        
         const savedCode = localStorage.getItem(localStorageKey);
         if (savedCode) { editor.setValue(savedCode); }
 
-        // --- 4. ПІДКЛЮЧЕННЯ WEBSOCKET ---
-        // Спробуємо підключитися одразу при завантаженні
-        // (на випадок, якщо агент вже запустив монітор раніше)
         connectWebSocket(standId);
+        
+        function finalizeJob() {
+            if (activeJobInterval) {
+                clearInterval(activeJobInterval);
+                activeJobInterval = null;
+            }
+            activeJobId = null;
+            activeJobEndpoint = null;
+            
+            flashButton.disabled = false;
+            compileButton.disabled = false;
+            cancelButton.style.display = 'none'; 
+            cancelButton.disabled = false; 
+            cancelButton.textContent = "❌ Скасувати";
+            editor.setOption("readOnly", false);
+        }
 
-        // --- 5. ПРИВ'ЯЗКА ПОДІЙ ---
+        let saveTimeout;
+        editor.on('change', () => {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                const currentCode = editor.getValue();
+                localStorage.setItem(localStorageKey, currentCode);
+            }, 500);
+        });
 
-        // 5.1 ЗБЕРЕЖЕННЯ КОДУ
-        // ... (без змін) ...
-
-        // 5.2 "Слухач" кнопки "Прошити" (FLASH)
         flashButton.addEventListener('click', () => {
-            // ... (блокування кнопок) ...
+            const code = editor.getValue(); 
+            const baudRate = document.getElementById('baud-rate-select').value;
+            if (!code.trim()) { alert('Поле коду не може бути порожнім!'); return; }
+            
             flashButton.disabled = true;
             compileButton.disabled = true;
+            cancelButton.style.display = 'inline-block';
             editor.setOption("readOnly", true);
-
-            // 🔽 Зупиняємо старий WS перед прошивкою 🔽
+            
             if (serialSocket) serialSocket.close();
 
-            const payload = { /* ... */ };
-
+            const payload = {
+                'stand': standId, 
+                'code_to_flash': code, 
+                'status': 'pending', 
+                'baud_rate': parseInt(baudRate, 10)
+            };
+            
             sendJob('/api/jobs/', payload, portMonitor)
                 .then(data => {
-                    portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} (Прошивка) створено...`;
-                    pollJobStatus(data.id, portMonitor, '/api/jobs/', (success) => {
-                        // onDone
-                        flashButton.disabled = false;
-                        compileButton.disabled = false;
-                        editor.setOption("readOnly", false);
-
-                        // 🔽 Якщо прошивка успішна, запускаємо WS 🔽
-                        if (success) {
-                            setTimeout(() => { // Даємо агенту 1 сек
-                                connectWebSocket(standId);
-                            }, 1000);
+                    portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} (Прошивка) створено. Очікуємо...`;
+                    
+                    activeJobId = data.id;
+                    activeJobEndpoint = '/api/jobs/';
+                    activeJobInterval = pollJobStatus(data.id, portMonitor, activeJobEndpoint, (success) => {
+                        finalizeJob(); 
+                        if (success) { 
+                            setTimeout(() => connectWebSocket(standId), 1000);
                         }
                     });
                 })
-                .catch(error => { /* ... (обробка помилок) ... */ });
+                .catch(error => {
+                    try { const errData = JSON.parse(error.message);
+                        portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${errData.error}`;
+                    } catch(e) { portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`; }
+                    finalizeJob();
+                });
         });
-
-        // 5.3 "СЛУХАЧ" ДЛЯ КОМПІЛЯЦІЇ
+        
         if (compileButton) {
             compileButton.addEventListener('click', () => {
-                // ... (блокування кнопок) ...
+                const code = editor.getValue(); 
+                if (!code.trim()) { alert('Поле коду не може бути порожнім!'); return; }
+                
                 flashButton.disabled = true;
                 compileButton.disabled = true;
-                editor.setOption("readOnly", true);
-
-                // 🔽 Зупиняємо WS (компіляція зупиняє монітор) 🔽
+                cancelButton.style.display = 'inline-block';
+                editor.setOption("readOnly", true); 
+                
                 if (serialSocket) serialSocket.close();
 
-                const payload = { /* ... */ };
-
+                const payload = {
+                    'stand': standId, 
+                    'code_to_compile': code, 
+                    'status': 'pending'
+                };
+                
                 sendJob('/api/compile-jobs/', payload, portMonitor)
                     .then(data => {
-                        portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} (Компіляція) створено...`;
-                        pollJobStatus(data.id, portMonitor, '/api/compile-jobs/', (success) => {
-                            // onDone
-                            flashButton.disabled = false;
-                            compileButton.disabled = false;
-                            editor.setOption("readOnly", false);
+                        portMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} (Компіляція) створено. Очікуємо...`;
+                        
+                        activeJobId = data.id;
+                        activeJobEndpoint = '/api/compile-jobs/';
+                        activeJobInterval = pollJobStatus(data.id, portMonitor, activeJobEndpoint, (success) => {
+                            finalizeJob(); 
                         });
                     })
-                    .catch(error => { /* ... (обробка помилок) ... */ });
+                    .catch(error => {
+                        try { const errData = JSON.parse(error.message);
+                            portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${errData.error}`;
+                        } catch(e) { portMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`; }
+                        finalizeJob();
+                    });
             });
         }
-
-        // 5.4 "Слухач" кнопки "Встановити бібліотеку (ЗА НАЗВОЮ)"
+        
+        if (cancelButton) {
+            cancelButton.addEventListener('click', () => {
+                if (!activeJobId || !activeJobEndpoint) return;
+                
+                const cancelUrl = `${activeJobEndpoint}${activeJobId}/cancel/`;
+                console.log(`[Cancel] Надсилання запиту на: ${cancelUrl}`);
+                
+                cancelButton.disabled = true;
+                cancelButton.textContent = "Скасування...";
+                
+                fetch(cancelUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrftoken }
+                })
+                .then(response => { 
+                    const contentType = response.headers.get('content-type');
+                    if (!response.ok) {
+                        if (contentType && contentType.includes('text/html')) {
+                            throw new Error('Помилка автентифікації. Схоже, ваша сесія вийшла. Оновіть сторінку.');
+                        }
+                        return response.json().then(errData => {
+                            throw new Error(errData.error || `Помилка сервера: ${response.status}`);
+                        });
+                    }
+                    if (contentType && contentType.includes('application/json')) {
+                        return response.json();
+                    }
+                    throw new Error('Отримано не-JSON відповідь від сервера.');
+                })
+                .then(data => {
+                    if (data.status === 'cancellation_requested') {
+                         portMonitor.textContent += `\n[Скасування] Надіслано запит на скасування. Очікування на відповідь агента...`;
+                    } else {
+                         portMonitor.textContent += `\n[Скасування] Не вдалося скасувати: ${data.error || 'невідома відповідь'}`;
+                         cancelButton.disabled = false;
+                         cancelButton.textContent = "❌ Скасувати";
+                    }
+                })
+                .catch(error => {
+                    console.error('[Cancel] Помилка скасування:', error);
+                    portMonitor.textContent += `\n[Скасування] Помилка: ${error.message}`;
+                    cancelButton.disabled = false;
+                    cancelButton.textContent = "❌ Скасувати";
+                });
+            });
+        }
+        
         if (libInstallButton) {
             libInstallButton.addEventListener('click', () => {
-                // ... (блокування кнопок) ...
-
-                // 🔽 Зупиняємо WS (встановлення зупиняє монітор) 🔽
+                const libraryName = libInstallName.value.trim();
+                if (!libraryName) { alert('Введіть назву бібліотеки!'); return; }
+                
+                libInstallButton.disabled = true;
+                libZipButton.disabled = true;
+                document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = true);
                 if (serialSocket) serialSocket.close();
-
-                const payload = { /* ... */ };
-
+                
+                const payload = {
+                    'stand': standId, 'library_name': libraryName, 'status': 'pending', 'job_type': 'install'
+                };
+                
                 sendJob('/api/lib-jobs/', payload, libInstallMonitor)
                     .then(data => {
-                        libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено...`;
+                        libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Встановлюємо '${data.library_name}'...`;
                         pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
-                            location.reload();
+                            location.reload(); 
                         });
                     })
-                    .catch(error => { /* ... (обробка помилок) ... */ });
+                    .catch(error => {
+                        libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`;
+                        libInstallButton.disabled = false;
+                        libZipButton.disabled = false;
+                        document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = false);
+                    });
             });
         }
 
-        // 5.5 "Слухач" ДЛЯ ВСТАНОВЛЕННЯ (З ZIP)
         if (libZipButton) {
             libZipButton.addEventListener('click', () => {
-                // ... (блокування кнопок) ...
-
-                // 🔽 Зупиняємо WS (встановлення зупиняє монітор) 🔽
+                const file = libZipInput.files[0];
+                if (!file) { alert('Будь ласка, виберіть .zip файл для завантаження.'); return; }
+                
+                libInstallButton.disabled = true;
+                libZipButton.disabled = true;
+                document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = true);
+                libInstallMonitor.textContent = '[...] Завантаження .zip файлу на сервер...';
                 if (serialSocket) serialSocket.close();
-
+                
                 const formData = new FormData();
-                /* ... */
+                formData.append('stand', standId);
+                formData.append('status', 'pending');
+                formData.append('library_zip', file);
+                formData.append('job_type', 'install');
 
-                fetch('/api/lib-jobs/', { /* ... */ })
-                .then(response => response.json())
+                fetch('/api/lib-jobs/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrftoken },
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) { 
+                        return response.json().then(err => { throw new Error(JSON.stringify(err)); });
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено...`;
+                    libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Встановлюємо з архіву...`;
                     pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
-                        location.reload();
+                        location.reload(); 
                     });
                 })
-                .catch(error => { /* ... (обробка помилок) ... */ });
+                .catch(error => {
+                    libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`;
+                    libInstallButton.disabled = false;
+                    libZipButton.disabled = false;
+                    document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = false);
+                });
             });
         }
-
-        // 5.6 "СЛУХАЧ" ДЛЯ КНОПОК "ВИДАЛИТИ"
+        
         if (installedLibsList) {
             installedLibsList.addEventListener('click', function(e) {
                 if (e.target.classList.contains('uninstall-lib-button')) {
-                    // ... (confirm) ...
+                    
+                    const libButton = e.target;
+                    const libName = libButton.dataset.libName;
+                    
+                    if (!libName || !confirm(`Ви впевнені, що хочете видалити бібліотеку "${libName}"?`)) {
+                        return;
+                    }
 
-                    // 🔽 Зупиняємо WS (видалення зупиняє монітор) 🔽
                     if (serialSocket) serialSocket.close();
+                    
+                    libInstallButton.disabled = true;
+                    libZipButton.disabled = true;
+                    document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = true);
 
-                    const payload = { /* ... */ };
+                    const payload = {
+                        'stand': standId,
+                        'library_name': libName,
+                        'job_type': 'uninstall',
+                        'status': 'pending'
+                    };
+                    
                     sendJob('/api/lib-jobs/', payload, libInstallMonitor)
                         .then(data => {
-                            libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено...`;
+                            libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Видалення '${data.library_name}'...`;
                             pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
-                                location.reload();
+                                location.reload(); 
                             });
                         })
-                        .catch(error => { /* ... (обробка помилок) ... */ });
+                        .catch(error => {
+                            libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] ПОМИЛКА! ${error.message}`;
+                            libInstallButton.disabled = false;
+                            libZipButton.disabled = false;
+                            document.querySelectorAll('.uninstall-lib-button').forEach(btn => btn.disabled = false);
+                        });
                 }
             });
         }
-
-        // 5.7 ОЧИЩЕННЯ СХОВИЩА ПРИ ВИХОДІ
+        
         if (releaseForm) {
             releaseForm.addEventListener('submit', () => {
                 localStorage.removeItem(localStorageKey);
-                // 🔽 Зупиняємо WS при виході 🔽
                 if (serialSocket) serialSocket.close();
             });
         }
 
-        // 5.8 Запуск "Пульсу"
-        setInterval(sendHeartbeat, 60000);
+        setInterval(sendHeartbeat, 60000); 
 
-        // 5.9 "СЛУХАЧ" ДЛЯ ЗАВАНТАЖЕННЯ .INO
-        if (fileInput) { /* ... (без змін) ... */ }
-
-        // 🔽🔽🔽 5.10 НОВІ СЛУХАЧІ ДЛЯ ВВОДУ SERIAL 🔽🔽🔽
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) { return; }
+                if (!file.name.endsWith('.ino')) {
+                    alert('Будь ласка, завантажуйте лише .ino файли');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const fileContent = event.target.result;
+                    editor.setValue(fileContent);
+                    localStorage.setItem(localStorageKey, fileContent);
+                };
+                reader.onerror = (event) => {
+                    alert('Не вдалося прочитати файл.');
+                    console.error("Помилка FileReader:", event);
+                };
+                reader.readAsText(file);
+                e.target.value = null;
+            });
+        }
+        
         serialSendButton.addEventListener('click', sendSerialData);
         serialInput.addEventListener('keypress', (e) => {
-            // Надіслати по 'Enter'
             if (e.key === 'Enter') {
                 sendSerialData();
             }
         });
-
+        
     });
 </script>
 {% endblock %}

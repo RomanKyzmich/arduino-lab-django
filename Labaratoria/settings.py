@@ -25,7 +25,13 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['178.20.158.192']
+#ALLOWED_HOSTS = ['178.20.158.192']
+ALLOWED_HOSTS = ['remote-lab.port0.org', '178.20.158.192'] 
+CSRF_TRUSTED_ORIGINS = ['https://remote-lab.port0.org']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
 
 
 # Application definition
