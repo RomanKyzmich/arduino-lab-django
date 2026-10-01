@@ -1,0 +1,18 @@
+{% extends 'core/base.html' %}
+{% block title %}Двофакторна автентифікація{% endblock %}
+
+{% block content %}
+<div style="max-width: 400px; margin: 40px auto; text-align: center;">
+    <h2>Підтвердження 2FA</h2>
+    <p>Відкрийте додаток <b>Google Authenticator</b> на телефоні та введіть 6-значний код:</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <p>
+            <input type="text" name="otp_code" maxlength="6" autofocus required 
+                   placeholder="123456" style="font-size: 24px; text-align: center; letter-spacing: 5px; width: 160px; padding: 6px;">
+        </p>
+        <button type="submit" style="padding: 10px 20px; font-size: 16px;">Підтвердити</button>
+    </form>
+</div>
+{% endblock %}

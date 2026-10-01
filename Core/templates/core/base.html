@@ -11,7 +11,64 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
 
-    {% block page_styles %}{% endblock %}
+    {% block page_styles %}
+        <style>
+  .user-toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+
+  .user-greeting {
+    color: #e5e7eb;
+    font-size: 14px;
+  }
+
+  .btn-action {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  /* Кнопка 2FA */
+  .btn-2fa {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+  }
+  .btn-2fa:hover {
+    background-color: #3b82f6;
+    color: #ffffff;
+    border-color: #3b82f6;
+  }
+
+  /* Кнопка Вийти */
+  .btn-logout {
+    background: transparent;
+    color: #9ca3af;
+    border: 1px solid #4b5563;
+  }
+  .btn-logout:hover {
+    background-color: #dc2626;
+    border-color: #dc2626;
+    color: #ffffff;
+  }
+
+  /* Додатково для Входу / Реєстрації */
+  .btn-primary {
+    background-color: #2563eb;
+    color: #fff;
+    border: 1px solid #2563eb;
+  }
+</style>
+    {% endblock %}
 </head>
 <body>
 
@@ -26,24 +83,24 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <!-- ВИПРАВЛЕНО: Залишився лише один ul ms-auto -->
             <ul class="navbar-nav ms-auto">
-
                 {% if user.is_authenticated %}
-                    <li class="nav-item">
-                        <span class="nav-link text-light">Вітаємо, {{ user.username }}!</span>
-                    </li>
-                    <li class="nav-item">
-                        <form method="post" action="{% url 'logout' %}" class="d-inline">
-                            {% csrf_token %}
-                            <button type="submit" class="nav-link btn btn-link">Вийти</button>
-                        </form>
-                    </li>
+                  <div class="user-toolbar">
+                    <span class="user-greeting">Вітаємо, <strong>{{ user.username }}</strong>!</span>
+
+                    <a href="{% url 'setup-2fa' %}" class="btn-action btn-2fa">
+                      🔒 Налаштувати 2FA
+                    </a>
+
+                    <form method="post" action="{% url 'logout' %}" style="display: inline; margin: 0;">
+                      {% csrf_token %}
+                      <button type="submit" class="btn-action btn-logout">Вийти</button>
+                    </form>
+                  </div>
                 {% else %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'login' %}">Вхід</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link btn btn-primary text-white btn-sm" href="{% url 'signup' %}">Реєстрація</a>
-                    </li>
+                  <div class="user-toolbar">
+                    <a href="{% url 'login' %}" class="btn-action">Вхід</a>
+                    <a href="{% url 'signup' %}" class="btn-action btn-primary">Реєстрація</a>
+                  </div>
                 {% endif %}
 
             </ul>

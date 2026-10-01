@@ -1,15 +1,25 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import UserCreationForm
+from .forms import CustomUserCreationForm
 from django.urls import reverse_lazy
 from django.views import generic
 from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
+import io
+import base64
+import qrcode
+import pyotp
+from django.contrib.auth import login as auth_login, authenticate
+from django.contrib.auth.models import User
+from django.contrib import messages
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import AuthenticationForm
 
 # Імпортуємо нашу модель
-from .models import LabStand
+from .models import LabStand, Profile
 
 
 @login_required
@@ -29,6 +39,87 @@ def stand_list_view(request):
     }
     return render(request, 'core/stand_list.html', context)
 
+@login_required
+def setup_2fa_view(request):
+    """Генерує QR-код для сканування в додатку Google Authenticator"""
+    profile, _ = Profile.objects.get_or_create(user=request.user)
+    secret = profile.generate_otp_secret()
+
+    # Створюємо URI для Google Authenticator
+    totp = pyotp.TOTP(secret)
+    otp_uri = totp.provisioning_uri(
+        name=request.user.email or request.user.username,
+        issuer_name="ArduinoLab"
+    )
+
+    # Генеруємо зображення QR-коду
+    img = qrcode.make(otp_uri)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    qr_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    if request.method == 'POST':
+        code = request.POST.get('otp_code', '').strip()
+        if totp.verify(code):
+            profile.is_2fa_enabled = True
+            profile.save()
+            messages.success(request, "2FA успішно активовано!")
+            return redirect('stand-list')
+        else:
+            messages.error(request, "Невірний код. Спробуйте ще раз.")
+
+    return render(request, 'core/setup_2fa.html', {
+        'qr_b64': qr_b64,
+        'secret': secret,
+        'is_enabled': profile.is_2fa_enabled
+    })
+
+
+def custom_login_view(request):
+    """Перший крок: перевірка логіна та пароля"""
+    if request.user.is_authenticated:
+        return redirect('stand-list')
+
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            profile, _ = Profile.objects.get_or_create(user=user)
+
+            if profile.is_2fa_enabled:
+                # Якщо 2FA увімкнено — зберігаємо ID і йдемо на перевірку коду
+                request.session['pre_2fa_user_id'] = user.id
+                return redirect('verify-2fa')
+            else:
+                auth_login(request, user)
+                return redirect('stand-list')
+    else:
+        form = AuthenticationForm(request)
+
+    return render(request, 'core/login.html', {'form': form})
+
+
+def verify_2fa_view(request):
+    """Другий крок: перевірка 6-значного коду з Google Authenticator"""
+    user_id = request.session.get('pre_2fa_user_id')
+    if not user_id:
+        return redirect('login')
+
+    user = get_object_or_404(User, id=user_id)
+    profile = user.profile
+
+    if request.method == 'POST':
+        code = request.POST.get('otp_code', '').strip()
+        totp = pyotp.TOTP(profile.otp_secret)
+
+        if totp.verify(code):
+            del request.session['pre_2fa_user_id']
+            auth_login(request, user)
+            return redirect('stand-list')
+        else:
+            messages.error(request, "Невірний код із Google Authenticator.")
+
+    return render(request, 'core/verify_2fa.html')
 
 @login_required
 def stand_detail_view(request, pk):
@@ -112,9 +203,6 @@ def release_stand_view(request, pk):
 
 
 class SignUpView(generic.CreateView):
-    """
-    Сторінка реєстрації користувачів.
-    """
-    form_class = UserCreationForm
-    success_url = reverse_lazy('login')  # Куди перекинути юзера після успішної реєстрації
-    template_name = 'core/signup.html'  # Який шаблон використовувати
+    form_class = CustomUserCreationForm
+    success_url = reverse_lazy('login')
+    template_name = 'core/signup.html'

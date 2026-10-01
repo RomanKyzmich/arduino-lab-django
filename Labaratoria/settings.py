@@ -26,7 +26,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = True
 
 #ALLOWED_HOSTS = ['178.20.158.192']
-ALLOWED_HOSTS = ['remote-lab.port0.org', '178.20.158.192'] 
+ALLOWED_HOSTS = ['remote-lab.port0.org', '178.20.158.192', '127.0.0.1', 'localhost']
 CSRF_TRUSTED_ORIGINS = ['https://remote-lab.port0.org']
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = True
