@@ -2,8 +2,8 @@ import json
 from channels.generic.websocket import WebsocketConsumer
 from asgiref.sync import async_to_sync
 
-class SerialConsumer(WebsocketConsumer):
 
+class SerialConsumer(WebsocketConsumer):
     def connect(self):
         self.stand_id = self.scope['url_route']['kwargs']['stand_id']
         self.stand_group_name = f'stand_{self.stand_id}'
@@ -18,59 +18,113 @@ class SerialConsumer(WebsocketConsumer):
             self.stand_group_name,
             self.channel_name
         )
-
         self.accept()
-        print(f"WebSocket: Користувач {self.user.username} (канал: {self.channel_name}) підключився до стенду {self.stand_id}")
+        print(f"WebSocket: Користувач {self.user.username} підключився до Serial стенду {self.stand_id}")
 
     def disconnect(self, close_code):
         async_to_sync(self.channel_layer.group_discard)(
             self.stand_group_name,
             self.channel_name
         )
-        print(f"WebSocket: Користувач (канал: {self.channel_name}) відключився зі стенду {self.stand_id}")
 
-    # --- 🔽 ПОЧАТОК ВИПРАВЛЕННЯ 🔽 ---
     def receive(self, text_data):
         data = json.loads(text_data)
         message = data.get('message', '')
         sender = data.get('sender', 'unknown')
 
-        if sender == 'user':
-            print(f"WS: Отримано від Користувача: {message.strip()}")
-        elif sender == 'agent':
-            print(f"WS: Отримано від Агента: {message.strip()}")
-
-        # 1. Пересилаємо повідомлення ВСІМ у групі (включаючи нас самих)
         async_to_sync(self.channel_layer.group_send)(
             self.stand_group_name,
             {
-                'type': 'serial_broadcast',  # <--- Назва функції-обробника
+                'type': 'serial_broadcast',
                 'message': message,
                 'sender': sender,
-                'origin_channel': self.channel_name # <--- Хто відправив
+                'origin_channel': self.channel_name
             }
         )
 
-    # Ця функція викликається у КОЖНОГО учасника групи
     def serial_broadcast(self, event):
-        sender = event.get('sender')
-        message = event.get('message')
-
-        # 2. НЕ надсилаємо повідомлення назад тому, хто його відправив
         if self.channel_name == event.get('origin_channel'):
             return
 
-        # 3. Визначаємо, кому відправити
+        sender = event.get('sender')
+        message = event.get('message')
+
         if sender == 'user':
-            # Це повідомлення від Користувача, воно призначене для Агента.
+            self.send(text_data=json.dumps({'message': message, 'sender': 'user'}))
+        elif sender == 'agent':
+            self.send(text_data=json.dumps({'message': message}))
+
+
+class VideoConsumer(WebsocketConsumer):
+    def connect(self):
+        self.stand_id = self.scope['url_route']['kwargs']['stand_id']
+        self.video_group_name = f'stand_{self.stand_id}_video'
+
+        # Визначаємо: агент чи глядач (в агента передається заголовок Authorization)
+        headers = dict(self.scope.get('headers', []))
+        self.is_agent = b'authorization' in headers
+
+        async_to_sync(self.channel_layer.group_add)(
+            self.video_group_name,
+            self.channel_name
+        )
+        self.accept()
+
+        if self.is_agent:
+            print(f"[VideoWS] 📹 Відеоагент підключився до стенду {self.stand_id}")
+        else:
+            print(f"[VideoWS] 👤 Глядач зайшов на стенд {self.stand_id}. Відправляємо команду START агенту...")
+            async_to_sync(self.channel_layer.group_send)(
+                self.video_group_name,
+                {
+                    'type': 'video_command',
+                    'command': 'start'
+                }
+            )
+
+    def disconnect(self, close_code):
+        if not getattr(self, 'is_agent', False):
+            print(f"[VideoWS] 👤 Глядач вийшов зі стенду {self.stand_id}. Відправляємо STOP...")
+            async_to_sync(self.channel_layer.group_send)(
+                self.video_group_name,
+                {
+                    'type': 'video_command',
+                    'command': 'stop'
+                }
+            )
+
+        async_to_sync(self.channel_layer.group_discard)(
+            self.video_group_name,
+            self.channel_name
+        )
+
+    def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+            # Якщо агент прислав новий кадр
+            if data.get('type') == 'frame':
+                async_to_sync(self.channel_layer.group_send)(
+                    self.video_group_name,
+                    {
+                        'type': 'video_broadcast',
+                        'data': data.get('data'),
+                        'origin_channel': self.channel_name
+                    }
+                )
+        except Exception as e:
+            print(f"[VideoWS] Помилка: {e}")
+
+    def video_broadcast(self, event):
+        # Відправляємо кадр ТІЛЬКИ глядачам (браузеру)
+        if not getattr(self, 'is_agent', False) and self.channel_name != event.get('origin_channel'):
             self.send(text_data=json.dumps({
-                'message': message,
-                'sender': 'user'
+                'type': 'frame',
+                'data': event.get('data')
             }))
 
-        elif sender == 'agent':
-            # Це повідомлення від Агента, воно призначене для Користувача (браузера).
+    def video_command(self, event):
+        # Відправляємо команди (start / stop) ТІЛЬКИ агенту
+        if getattr(self, 'is_agent', False):
             self.send(text_data=json.dumps({
-                'message': message
+                'command': event.get('command')
             }))
-    # --- 🔼 КІНЕЦЬ ВИПРАВЛЕННЯ 🔼 ---

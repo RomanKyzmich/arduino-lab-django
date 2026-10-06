@@ -153,14 +153,12 @@ void loop() {
                 </div>
             </div>
             </div> <div class="col-md-4">
-            {% if stand.video_stream_url %}
             <div class="card mb-4">
-                <div class="card-header">Відео зі стенду</div>
-                <div class="card-body p-0" style="background: #000;">
-                    <img src="{{ stand.video_stream_url }}" class="img-fluid" alt="Live video feed">
-                </div>
-            </div>
-            {% endif %}
+       <div class="card-header font-weight-bold">📹 Відео зі стенду</div>
+       <div class="card-body p-0" style="background: #000; text-align: center;">
+        <img id="video-stream" src="" class="img-fluid" alt="Очікування трансляції..." style="min-height: 240px; width: 100%; display: block; object-fit: contain;">
+       </div>
+      </div>
             
             <div class="card">
                 <div class="card-header">Статус</div>
@@ -579,7 +577,7 @@ void loop() {
                     .then(data => {
                         libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Встановлюємо '${data.library_name}'...`;
                         pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
-                            location.reload(); 
+                            setTimeout(() => { location.reload(); }, 1000);
                         });
                     })
                     .catch(error => {
@@ -622,7 +620,7 @@ void loop() {
                 .then(data => {
                     libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Встановлюємо з архіву...`;
                     pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
-                        location.reload(); 
+                        setTimeout(() => { location.reload(); }, 1000);
                     });
                 })
                 .catch(error => {
@@ -662,7 +660,7 @@ void loop() {
                         .then(data => {
                             libInstallMonitor.textContent = `[${new Date().toLocaleTimeString()}] Завдання #${data.id} створено. Видалення '${data.library_name}'...`;
                             pollJobStatus(data.id, libInstallMonitor, '/api/lib-jobs/', () => {
-                                location.reload(); 
+                                setTimeout(() => { location.reload(); }, 1000);
                             });
                         })
                         .catch(error => {
@@ -715,5 +713,22 @@ void loop() {
         });
         
     });
+</script>
+
+<script>
+(function() {
+    const wsScheme = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const videoWs = new WebSocket(wsScheme + window.location.host + '/ws/video/{{ stand.id }}/');
+    const vImg = document.getElementById('video-stream');
+
+    videoWs.onmessage = function(e) {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'frame' && vImg) {
+                vImg.src = 'data:image/jpeg;base64,' + data.data;
+            }
+        } catch(err) {}
+    };
+})();
 </script>
 {% endblock %}

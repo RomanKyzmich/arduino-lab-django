@@ -12,7 +12,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
 
     {% block page_styles %}
-        <style>
+    {% endblock %}
+
+         <style>
   .user-toolbar {
     display: inline-flex;
     align-items: center;
@@ -68,7 +70,7 @@
     border: 1px solid #2563eb;
   }
 </style>
-    {% endblock %}
+
 </head>
 <body>
 
@@ -84,23 +86,25 @@
             <!-- ВИПРАВЛЕНО: Залишився лише один ul ms-auto -->
             <ul class="navbar-nav ms-auto">
                 {% if user.is_authenticated %}
-                  <div class="user-toolbar">
-                    <span class="user-greeting">Вітаємо, <strong>{{ user.username }}</strong>!</span>
+                  <span style="color: #e5e7eb; font-size: 14px; margin-right: 12px; font-family: system-ui, sans-serif;">
+                    Вітаємо, <strong>{{ user.username }}</strong>!
+                  </span>
 
-                    <a href="{% url 'setup-2fa' %}" class="btn-action btn-2fa">
-                      🔒 Налаштувати 2FA
-                    </a>
+                  <a href="{% url 'setup-2fa' %}"
+                     style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; font-size: 13px; font-weight: 500; color: #60a5fa; background-color: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; text-decoration: none; margin-right: 8px; font-family: system-ui, sans-serif;">
+                    🔒 Налаштувати 2FA
+                  </a>
 
-                    <form method="post" action="{% url 'logout' %}" style="display: inline; margin: 0;">
-                      {% csrf_token %}
-                      <button type="submit" class="btn-action btn-logout">Вийти</button>
-                    </form>
-                  </div>
+                  <form method="post" action="{% url 'logout' %}" style="display: inline; margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit"
+                            style="padding: 5px 12px; font-size: 13px; font-weight: 500; color: #9ca3af; background: transparent; border: 1px solid #4b5563; border-radius: 6px; cursor: pointer; font-family: system-ui, sans-serif;">
+                      Вийти
+                    </button>
+                  </form>
                 {% else %}
-                  <div class="user-toolbar">
-                    <a href="{% url 'login' %}" class="btn-action">Вхід</a>
-                    <a href="{% url 'signup' %}" class="btn-action btn-primary">Реєстрація</a>
-                  </div>
+                  <a href="{% url 'login' %}" style="color: #60a5fa; text-decoration: none; margin-right: 12px;">Вхід</a>
+                  <a href="{% url 'signup' %}" style="padding: 5px 12px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 6px;">Реєстрація</a>
                 {% endif %}
 
             </ul>
