@@ -17,6 +17,8 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
+from django.core.exceptions import PermissionDenied
+from .forms import get_allowed_emails
 
 # Імпортуємо нашу модель
 from .models import LabStand, Profile
@@ -132,21 +134,19 @@ def stand_detail_view(request, pk):
 
     # 1. Перевіряємо, чи стенд зайнятий кимось іншим
     if stand_to_occupy.is_busy and not is_owner:
-
-        # 2. Розраховуємо час, коли "замок" застаріє
+        # 2. Розраховуємо поріг застарілості замка
         timeout_duration = timedelta(minutes=settings.STAND_AUTO_RELEASE_MINUTES)
+        prev_user = stand_to_occupy.current_user.username if stand_to_occupy.current_user else "минулого користувача"
 
         if stand_to_occupy.occupied_since and (timezone.now() - stand_to_occupy.occupied_since) > timeout_duration:
             messages.info(request,
-                          f"Стенд '{stand_to_occupy.name}' був автоматично звільнений від {stand_to_occupy.current_user.username} через неактивність.")
+                          f"Стенд '{stand_to_occupy.name}' був автоматично звільнений від {prev_user} через неактивність.")
             stand_to_occupy.is_busy = False
             stand_to_occupy.current_user = None
             stand_to_occupy.occupied_since = None
-            stand_to_occupy.save()  # Зберігаємо "звільнення"
-
+            stand_to_occupy.save()
         else:
-            messages.warning(request,
-                             f"Стенд '{stand_to_occupy.name}' наразі зайнятий {stand_to_occupy.current_user.username}.")
+            messages.warning(request, f"Стенд '{stand_to_occupy.name}' наразі зайнятий ({prev_user}).")
             return redirect('stand-list')
 
     # --- 🔽 ПОЧАТОК ВИПРАВЛЕННЯ (ЦЕ НОВИЙ КОД) 🔽 ---
@@ -203,6 +203,23 @@ def release_stand_view(request, pk):
 
 
 class SignUpView(generic.CreateView):
+    """Сторінка реєстрації користувачів"""
     form_class = CustomUserCreationForm
-    success_url = reverse_lazy('login')
     template_name = 'core/signup.html'
+    success_url = reverse_lazy('setup-2fa')
+
+    def form_valid(self, form):
+        email = form.cleaned_data.get('email', '').strip().lower()
+        allowed_emails = get_allowed_emails()
+
+        # 💡 Якщо пошти немає в списку — видаємо сувору помилку 403 Forbidden
+        if email not in allowed_emails:
+            raise PermissionDenied("Доступ заборонено. Реєстрація для цієї адреси недоступна.")
+
+        response = super().form_valid(form)
+        auth_login(self.request, self.object)
+        messages.info(
+            self.request,
+            "Акаунт створено! Для завершення обов'язково налаштуйте Google Authenticator."
+        )
+        return response

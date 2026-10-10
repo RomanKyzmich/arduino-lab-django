@@ -20,6 +20,20 @@ class FlashJobViewSet(viewsets.ModelViewSet):
     serializer_class = FlashJobSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        stand = self.request.query_params.get("stand") or self.request.query_params.get("stand_id")
+        if stand:
+            qs = qs.filter(stand_id=stand)
+        status_param = self.request.query_params.get("status")
+        if status_param:
+            qs = qs.filter(status=status_param)
+        ordering = self.request.query_params.get("ordering")
+        if ordering:
+            qs = qs.order_by(ordering)
+        return qs
+
+
     # 🔽🔽🔽 2. ПЕРЕВИЗНАЧТЕ МЕТОД 'CREATE' 🔽🔽🔽
     def create(self, request, *args, **kwargs):
         code = request.data.get('code_to_flash')
@@ -138,6 +152,20 @@ class LibraryJobViewSet(viewsets.ModelViewSet):
     serializer_class = LibraryJobSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        stand = self.request.query_params.get("stand") or self.request.query_params.get("stand_id")
+        if stand:
+            qs = qs.filter(stand_id=stand)
+        status_param = self.request.query_params.get("status")
+        if status_param:
+            qs = qs.filter(status=status_param)
+        ordering = self.request.query_params.get("ordering")
+        if ordering:
+            qs = qs.order_by(ordering)
+        return qs
+
+
     def perform_create(self, serializer):
         """
         Автоматично призначаємо поточного користувача.
@@ -152,6 +180,20 @@ class CompileJobViewSet(viewsets.ModelViewSet):
     queryset = CompileJob.objects.all().order_by('-created_at')
     serializer_class = CompileJobSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        stand = self.request.query_params.get("stand") or self.request.query_params.get("stand_id")
+        if stand:
+            qs = qs.filter(stand_id=stand)
+        status_param = self.request.query_params.get("status")
+        if status_param:
+            qs = qs.filter(status=status_param)
+        ordering = self.request.query_params.get("ordering")
+        if ordering:
+            qs = qs.order_by(ordering)
+        return qs
+
 
     def create(self, request, *args, **kwargs):
         """

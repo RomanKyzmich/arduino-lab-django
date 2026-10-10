@@ -1,9 +1,20 @@
-venv/
-.env
+# Python / Django
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.log
+local_settings.py
 db.sqlite3
-.idea/
-.vscode/
+db.sqlite3-journal
+
+# Середовища
+venv/
+env/
+.env
+
+# Статика та завантаження
+media/
+staticfiles/
+
+# Резервні копії
+*.bak
